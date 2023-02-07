@@ -16,6 +16,7 @@ king = piece(4)
 pawn = piece(5)
 
 
+
 piecesRank = np.array([rook, knight, bishop, queen, king, bishop, knight, rook ])
 pawnsRank = np.array([pawn, pawn, pawn, pawn, pawn, pawn, pawn, pawn])
 emptyRank = np.array([emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell])
@@ -42,3 +43,7 @@ def get_random_board():
     random_board = np.zeros((64, 6))
     np.add.at(random_board,all_coords[0: piece_count], all_pieces[0: piece_count])
     return random_board.reshape(8, 8, 6)
+
+
+def printPiece(piece):
+    chars = ['♜', '♞', '♝', '♛', '♚', '♟︎']

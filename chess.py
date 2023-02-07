@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
-from board import get_random_board, initialBoard
+from board import get_random_board, initialBoard, pawn, piecesRank
 from eval import evalBoard
+from view import print_piece, print_rank
 
 
 # Chess board representation will be a 8x8x6 where the 3rd dimension, each one represents a piece type
@@ -11,6 +12,9 @@ from eval import evalBoard
 training_set_size = 10000
 x_train = np.array(list(map(lambda x: get_random_board(), range(0, training_set_size))))
 y_train = np.array(list(map(evalBoard, x_train)))
+
+print_rank(piecesRank, True)
+exit()
 
 print(y_train)
 
