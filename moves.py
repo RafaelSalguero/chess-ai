@@ -54,21 +54,31 @@ def has_piece(board, pos, white):
 # returns a new board after the move was applied
 def apply_move(board, move):
     ret = np.copy(board)
-    set_cell(ret, move[0], emptyCell)
-    set_cell(ret, move[1], cell(board, move[0]))
-    
-    promote_matrix = np.array([
-        rook,
-        knight,
-        bishop,
-        queen,
-        king,
-        queen,
-    ])
-    if(move[1][0] == 0 or move[1][0] == 7):
-        set_cell(ret, move[1], np.matmul(cell(ret, move[1]), promote_matrix))
-
+    apply_move_inplace(ret, move)
     return ret
+
+# apply a move in the given board, returns an object that can be passed to undo_move_inplace
+def apply_move_inplace(board, move):
+    orig_cells = np.copy([cell(board, move[0]), cell(board, move[1])])
+
+    end_piece = orig_cells[0]
+    
+    # promotions:
+    if(move[1][0] == 0 and np.array_equal(end_piece, pawn)):
+        end_piece = queen
+
+    if(move[1][0] == 7 and np.array_equal(end_piece, -pawn)):
+        end_piece = -queen
+
+
+    set_cell(board, move[0], emptyCell)
+    set_cell(board, move[1], end_piece)
+    
+    return orig_cells
+
+def undo_move_inplace(board, move, undo):
+    set_cell(board, move[0], undo[0])
+    set_cell(board, move[1], undo[1])
 
 def get_pawn_moves(board, pos):
     forward = [-1, 0]

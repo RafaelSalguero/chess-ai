@@ -1,5 +1,5 @@
 from board import initialBoard, testInitialBoard
-# from chess import find_best_move
+from chess import find_best_move
 from view import print_board
 from chess import ai_eval_board, find_best_move
 from moves import move_str, flip_board, flip_move, get_all_moves, str_move, apply_move
@@ -45,8 +45,14 @@ def play(board, white, white_player, black_player):
         eval_depths = [0, 1, 2, 3, 4]
         evals = np.array(list(map(lambda depth: minimax(board, depth, evalBoard, win_threshold), eval_depths))) * white
         print("minmax eval", evals)
-        print("ai eval", ai_eval_board(board))
+        # print("ai eval", ai_eval_board(board))
 
+        moves = get_all_moves(board)
+
+        if(len(moves) == 0):
+            print("No more moves")
+            break
+        
         player = white_player if white==1 else black_player
         next_move = player(board, white)
 
@@ -57,4 +63,4 @@ def play(board, white, white_player, black_player):
             
         white = -white
 
-play(testInitialBoard, 1, console_player, ai_player)
+play(testInitialBoard, 1, ai_player, ai_player)

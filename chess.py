@@ -13,13 +13,11 @@ from minmax import minimax
 
 model = tf.keras.Sequential([
     tf.keras.Input(shape=(8,8,6)),
-    tf.keras.layers.Conv2D(32, 7, activation="relu", padding="same"),
-    tf.keras.layers.Conv2D(32, 5, activation="relu", padding="same"),
-    tf.keras.layers.Conv2D(32, 3, activation="relu", padding="same"),
+    tf.keras.layers.Conv2D(8,1, activation="relu"),
+    tf.keras.layers.Conv2D(3,3, activation="relu", padding="same"),
     tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(256, activation="relu"),
-    tf.keras.layers.Dense(64, activation="relu"),
-
+    tf.keras.layers.Dense(32, activation="relu"),
+    tf.keras.layers.Dense(32, activation="relu"),
     tf.keras.layers.Dense(1),
 ])
 
@@ -28,24 +26,26 @@ print(model.summary())
 loss_fn = tf.keras.losses.MeanSquaredError()
 model.compile(optimizer='adam', loss=loss_fn, metrics=[tf.keras.metrics.RootMeanSquaredError()])
 
+def get_train_data(eval_func, size):
+    x_train = np.array(list(map(lambda x: get_test_random_board(), range(0, size))))
+    y_train = np.array(list(map(eval_func, x_train)))
+    return (x_train, y_train)
 
 def train_model(eval_func):
     print("generating test data...")
-    training_set_size = 1000
-    x_train = np.array(list(map(lambda x: get_test_random_board(), range(0, training_set_size))))
-    y_train = np.array(list(map(eval_func, x_train)))
+    training_set_size = 10000
+    (x_train, y_train) = get_train_data(eval_func, training_set_size)
 
     for i in range(0,20):
         print_board(x_train[i])
         print("y_train: " + str(y_train[i]))
 
-    model.fit(x_train, y_train, epochs=1000, callbacks=[
+    model.fit(x_train, y_train,  epochs=1000, callbacks=[
          tf.keras.callbacks.EarlyStopping("loss", min_delta=10, patience=3, mode="min")
     ])
 
     validate_test_size = 250
-    x_test = np.array(list(map(lambda x: get_random_board(), range(0, validate_test_size))))
-    y_test = np.array(list(map(eval_func, x_test)))
+    (x_test, y_test) = get_train_data(eval_func, validate_test_size)
     model.evaluate(x_test,  y_test, verbose=2)
 
 
@@ -60,14 +60,16 @@ def train_minmax_model(eval_func, depth):
     def minmax_eval_board(board):
             return minimax(board, depth, eval_func, win_threshold)
     train_model(minmax_eval_board)
+     
 
 # Finds the best move for white
 def find_best_move(board):
     moves = get_all_moves(board)
     boards = np.array(list(map(lambda move: apply_move(board, move), moves)))
-    evals = model.predict(boards, verbose=0)
+    
+    evals = internal_model_eval(boards)
     
     print("model eval: " + str(np.max(evals)))
     return moves[np.argmax(evals)]
 
-train_minmax_model(evalBoard, 3)
+train_minmax_model(evalBoard, 0)
