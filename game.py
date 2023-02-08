@@ -1,17 +1,19 @@
-from board import initialBoard
-from chess import find_best_move
+from board import initialBoard, testInitialBoard
+# from chess import find_best_move
 from view import print_board
+from chess import ai_eval_board, find_best_move
 from moves import move_str, flip_board, flip_move, get_all_moves, str_move, apply_move
-board = initialBoard
-white = True
+from minmax import minimax
+from eval import evalBoard, win_threshold
+import numpy as np
 
 def console_player(board, white):
     all_moves = get_all_moves(board)
     
-    valid_next_moves_str = list(map(lambda move: move_str(move if white else flip_move(move)), all_moves))
+    valid_next_moves_str = list(map(lambda move: move_str(move if white == 1 else flip_move(move)), all_moves))
     print(valid_next_moves_str)
 
-    print("next move?")
+    print(("white " if white==1 else "black") +  " - next move?")
 
     next_move = ''
     while True:
@@ -21,7 +23,7 @@ def console_player(board, white):
             break
 
         print("invalid move")
-    if(not white):
+    if(white == -1):
         next_move = flip_move(next_move)
     
     return next_move
@@ -36,17 +38,23 @@ def ai_player(board, white):
 def play(board, white, white_player, black_player):
     while True:
         print_board(board)
-        if(not white):
+
+        if(white == -1):
             board = flip_board(board)
 
-        player = white_player if white else black_player
+        eval_depths = [0, 1, 2, 3, 4]
+        evals = np.array(list(map(lambda depth: minimax(board, depth, evalBoard, win_threshold), eval_depths))) * white
+        print("minmax eval", evals)
+        print("ai eval", ai_eval_board(board))
+
+        player = white_player if white==1 else black_player
         next_move = player(board, white)
 
         board = apply_move(board, next_move)
 
-        if(not white):
+        if(white == -1):
             board = flip_board(board)
             
-        white = not white
+        white = -white
 
-play(initialBoard, True, console_player, ai_player)
+play(testInitialBoard, 1, console_player, ai_player)

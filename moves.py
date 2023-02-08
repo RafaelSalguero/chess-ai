@@ -1,5 +1,5 @@
 import numpy as np
-from board import pawn, emptyCell
+from board import pawn, emptyCell, king, rook, knight, bishop, queen
 # A move is represented as  [[y_start, x_start], [y_end, x_end]]
 # All moves are calculated for white, the board is flipped when calculating black moves
 
@@ -56,8 +56,19 @@ def apply_move(board, move):
     ret = np.copy(board)
     set_cell(ret, move[0], emptyCell)
     set_cell(ret, move[1], cell(board, move[0]))
+    
+    promote_matrix = np.array([
+        rook,
+        knight,
+        bishop,
+        queen,
+        king,
+        queen,
+    ])
+    if(move[1][0] == 0 or move[1][0] == 7):
+        set_cell(ret, move[1], np.matmul(cell(ret, move[1]), promote_matrix))
 
-    return ret;
+    return ret
 
 def get_pawn_moves(board, pos):
     forward = [-1, 0]
@@ -66,32 +77,53 @@ def get_pawn_moves(board, pos):
     # move 1 forward:
     next_pos = pos + forward
     if(pos_inside(next_pos) and is_empty_cell(board, next_pos)):
-        ret.append([pos, next_pos])
+        ret.append(next_pos)
     
     # move 2 forward:
     start_y = 6
     next_pos = pos + forward + forward
     if(pos[0] == start_y and is_empty_cell(board, next_pos)):
-        ret.append([pos, next_pos])
+        ret.append(next_pos)
 
     # take:
     next_pos = pos + forward + np.array([0, 1])
     if(has_piece(board, next_pos, False)):
-        ret.append([pos, next_pos])
+        ret.append(next_pos)
 
     next_pos = pos + forward + np.array([0, -1])
     if(has_piece(board, next_pos, False)):
-        ret.append([pos, next_pos])
+        ret.append(next_pos)
+
+    return ret
+
+bishop_vectors = np.array([[-1, -1], [-1, 1], [1, -1], [1, 1]])
+rook_vectors = np.array([[0, 1], [0, -1], [1, 0], [-1, 0]])
+queen_vectors = np.concatenate((bishop_vectors, rook_vectors))
+
+def get_king_moves(board, pos):
+    ret = []
+    all_next_pos = queen_vectors + pos
+    for next_pos in all_next_pos:
+        if(not pos_inside(next_pos)):
+            continue
+        if(has_piece(board, next_pos, True)):
+            continue
+        ret.append(next_pos)
 
     return ret
 
 def get_all_moves(board):
     ret = []
-    for x in range(0, 8):
-        for y in range(0, 8):
-            pos = np.array([x, y])
-            cell = board[x, y]
+    for y in range(0, 8):
+        for x in range(0, 8):
+            pos = np.array([y, x])
+            cell = board[y, x]
+            curr_ret = []
             if(np.array_equal(cell, pawn)):
-                ret += get_pawn_moves(board, pos)
+                curr_ret += get_pawn_moves(board, pos)
+            elif (np.array_equal(cell, king)):
+                curr_ret += get_king_moves(board, pos)
+
+            ret += list(map(lambda np: [pos, np], curr_ret))
     
     return ret
