@@ -32,25 +32,15 @@ initialBoard = np.array([
 
 testInitialBoard = np.array([
     -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, king]),
-    emptyRank,
-    emptyRank,
-    emptyRank,
-    emptyRank,
     -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, pawn, emptyCell]),
+    emptyRank,
+    emptyRank,
+    emptyRank,
+    emptyRank,
     np.array([  emptyCell, pawn, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
     np.array([  king, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
 ])
 
-errBoard = np.array([
-    -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, king]),
-    emptyRank,
-    emptyRank,
-    np.array([  emptyCell, pawn, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
-    np.array([  emptyCell, emptyCell, emptyCell, -queen, emptyCell, emptyCell, emptyCell, emptyCell]),
-    emptyRank,
-    emptyRank,
-    np.array([  king, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
-])
 
 
 def get_random_board_gen(all_pieces):

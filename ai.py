@@ -52,17 +52,25 @@ def ai_eval_board(board):
 
 def train_minmax_model(eval_func, depth):
     def minmax_eval_board(board):
-            return minimax(board, 1, depth, eval_func, win_threshold)
+            (value,) = minimax(board, 1, depth, eval_func, win_threshold)
+            return value
     train_model(minmax_eval_board)
      
 
 # Finds the best move for white
-def find_best_move(board):
+def find_best_move_ai(board):
     moves = get_all_moves(board, 1)
     boards = np.array(list(map(lambda move: apply_move(board, move), moves)))
     
     evals = internal_model_eval(boards)
     return moves[np.argmax(evals)]
 
-data = get_minmax_train_data("evalBoard", get_test_random_board, evalBoard, 10000, 250, 0)
-train_model(data)
+def find_best_move_minimax(board, depth):
+    if(depth < 1):
+        raise Exception("Depth should be >= 1")
+    
+    (value, best_variation, best_move) = minimax(board, 1, depth, evalBoard, win_threshold, False)
+    return best_move
+
+# data = get_minmax_train_data("evalBoard", get_test_random_board, evalBoard, 10000, 250, 0)
+# train_model(data)
