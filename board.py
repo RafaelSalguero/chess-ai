@@ -41,9 +41,20 @@ testInitialBoard = np.array([
     np.array([  king, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
 ])
 
+errBoard = np.array([
+    -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, king]),
+    emptyRank,
+    emptyRank,
+    np.array([  emptyCell, pawn, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
+    np.array([  emptyCell, emptyCell, emptyCell, -queen, emptyCell, emptyCell, emptyCell, emptyCell]),
+    emptyRank,
+    emptyRank,
+    np.array([  king, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell]),
+])
+
 
 def get_random_board_gen(all_pieces):
-    piece_count = np.random.randint(all_pieces.shape[0])
+    piece_count = np.random.randint(1, all_pieces.shape[0])
     # Generates a random chess board
     all_coords = np.arange(0, 64, 1)
     np.random.shuffle(all_pieces)
