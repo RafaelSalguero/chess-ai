@@ -1,8 +1,7 @@
 from board import initialBoard, testInitialBoard
 from view import print_board
-from ai import ai_eval_board, find_best_move_ai, find_best_move_minimax
 from moves import move_str, flip_board, flip_move, get_all_moves, str_move, apply_move
-from minmax import minimax
+from minmax import minimax, find_best_move_minimax
 from eval import evalBoard, win_threshold, evalWin
 import numpy as np
 
@@ -39,8 +38,6 @@ def auto_player(board, color, find_best_move):
 
     return best_move
 
-def ai_player(board, color):
-    return auto_player(board, color, find_best_move_ai)
 
 def minimax_player(depth):
     def player(board, color):
@@ -60,14 +57,12 @@ def play(board, color, white_player, black_player, print_evals = True,show_board
 
         win = evalWin(board)
         if(win != 0):
-            print("Win: " + ("white" if win == 1 else "black"))
             return win
 
         if(print_evals):
             eval_depths = [0, 1, 2, 3, 4]
             evals = np.array(list(map(lambda depth: minimax(board, color, depth, evalBoard, win_threshold), eval_depths)))
             print("minmax eval", evals)
-            print("ai eval", ai_eval_board(board))
 
         moves = get_all_moves(board, color)
 
@@ -78,12 +73,15 @@ def play(board, color, white_player, black_player, print_evals = True,show_board
         player = white_player if color==1 else black_player
         next_move = player(board, color)
 
+        if(show_board):
+            print(move_str(next_move))
+
         board = apply_move(board, next_move)
 
         color = -color
 
 # Run N games between a and b playes, returns the win rate for a player a
-def simulateGames(board, a, b, count):
+def simulateGames(board, a, b, count, print_games = False):
     color = 1
     draws = 0
     score = 0
@@ -92,12 +90,16 @@ def simulateGames(board, a, b, count):
     b_wins = 0
     a_rate = 0
     for i in range(0, count):
-        print(f'Simulating game {i}/{count}')
-        win = play(board, 1, a, b, False, False, False) * color
+        player_color_msg = 'white' if color == 1 else 'black'
+        print(f'Simulating game {i}/{count}, a = {player_color_msg}')
+        win = play(board, 1, a, b, False, print_games, False) * color
         
         if(win == 0):
             draws+=1
         else:
+            winner = "a" if win == 1 else "b"
+            winner_color =  "white" if win * color == 1 else "black"
+            print(f'Winner: {winner} ({winner_color})')
             score += win
 
         # flip:
@@ -117,4 +119,3 @@ def simulateGames(board, a, b, count):
   
     return a_rate
 
-simulateGames(testInitialBoard, minimax_player(2), minimax_player(3), 100)

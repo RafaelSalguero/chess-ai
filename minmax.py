@@ -1,6 +1,5 @@
 import random
 import numpy as np
-from board import get_test_random_board
 from moves import flip_move, get_all_moves, apply_move, move_str, flip_board, apply_move_inplace, undo_move_inplace
 from view import print_board
 from eval import evalBoard, win_threshold
@@ -57,3 +56,10 @@ def alphabeta(board, color, depth, alpha, beta, eval_func, win_threshold, parent
 
 def minimax(board, color, depth, eval_func, win_threshold, calc_variation = True):
     return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, win_threshold, Variation(None, None) if calc_variation else None)
+
+def find_best_move_minimax(board, depth):
+    if(depth < 1):
+        raise Exception("Depth should be >= 1")
+    
+    (value, best_variation, best_move) = minimax(board, 1, depth, evalBoard, win_threshold, False)
+    return best_move
