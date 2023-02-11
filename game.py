@@ -91,7 +91,8 @@ def simulateGames(board, a, b, count, print_games = False):
     a_rate = 0
     for i in range(0, count):
         player_color_msg = 'white' if color == 1 else 'black'
-        print(f'Simulating game {i}/{count}, a = {player_color_msg}')
+        if(print_games):
+            print(f'Simulating game {i}/{count}, a = {player_color_msg}')
         win = play(board, 1, a, b, False, print_games, False) * color
         
         if(win == 0):
@@ -99,7 +100,8 @@ def simulateGames(board, a, b, count, print_games = False):
         else:
             winner = "a" if win == 1 else "b"
             winner_color =  "white" if win * color == 1 else "black"
-            print(f'Winner: {winner} ({winner_color})')
+            if(print_games):
+                print(f'Winner: {winner} ({winner_color})')
             score += win
 
         # flip:
@@ -114,7 +116,8 @@ def simulateGames(board, a, b, count, print_games = False):
         b_wins = total - a_wins
         a_rate = a_wins / total
 
-        print(f'a_wins: {a_wins}, b_wins: {b_wins}, a_rate: {a_rate}, draws: {draws}, score: {score}')
+        if(print_games):
+            print(f'a_wins: {a_wins}, b_wins: {b_wins}, a_rate: {a_rate}, draws: {draws}, score: {score}')
 
   
     return a_rate

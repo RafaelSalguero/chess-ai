@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from ai_arch import arch_a0, arch_a1_c0, arch_a1_c1, arch_a1_c2, arch_a1_d0, arch_a1_d1
 
 from board import testInitialBoard
 from eval import evalBoard
@@ -9,22 +10,15 @@ from moves import apply_move, flip_board, get_all_moves, move_str
 from minmax import minimax
 
 
+# Disable GPU training:
+tf.config.set_visible_devices([], 'GPU')
+
 # Chess board representation will be a 8x8x6 where the 3rd dimension, each one represents a piece type
 # Piece types: 0 Pawn, 1 Knight,  2 Bishop, 3 Rook, 4 Queen, 5 King
 
-def create_model():
-    model = tf.keras.Sequential()
-    model.add(tf.keras.Input(shape=(8,8,6)))
-    model.add(tf.keras.layers.Conv2D(6,3, padding="same"))
-    model.add(tf.keras.layers.Conv2D(5,7, padding="same"))
-    model.add(tf.keras.layers.Conv2D(4,17, padding="same"))
 
-    model.add(tf.keras.layers.Flatten())
-
-    model.add(tf.keras.layers.Dense(128, activation = "swish"))
-    model.add(tf.keras.layers.Dense(8, activation = "swish"))
-
-    model.add(tf.keras.layers.Dense(1))
+def create_model(arch):
+    model = arch()
 
     print(model.summary())
 
@@ -37,8 +31,8 @@ def train_model(model, data):
 
     print("train size: " + str(x_train.shape[0]))
 
-    model.fit(x_train, y_train,  epochs=1000, callbacks=[
-         tf.keras.callbacks.EarlyStopping("loss", min_delta=10, patience=5, mode="min")
+    model.fit(x_train, y_train, epochs=1000, callbacks=[
+         tf.keras.callbacks.EarlyStopping("loss", min_delta=5, patience=20, mode="min")
     ])
 
     model.evaluate(x_test,  y_test, verbose=2)
@@ -94,7 +88,7 @@ def amplify_training_data(model, name, size=50000):
 
 
 # creates an AI player for the given model
-def ai_player(model, depth = 1, verbose = False):
+def ai_player(model, verbose = False):
     def find_best(board):
         return find_best_move_ai(model, board, verbose=verbose)
     
@@ -103,25 +97,81 @@ def ai_player(model, depth = 1, verbose = False):
     
     return player
 
+def ai_player_amplified(model, verbose = False):
+    def eval(board, color):
+        return ai_eval_board (model, board, color)
+    return minimax_player(2, eval)
 
-# old_model = create_model()
-curr_model = create_model()
 
+old_model = create_model(arch_a0)
+old_model_name = "evalBoard_0"
 # Train with the initial eval function:
-# initial_train(old_model, "evalBoard", 0, 10000)
-# curr_model = tf.keras.models.load_model("models/evalBoard_0")
+initial_train(old_model, "evalBoard", 0, 10000)
 
-# initial_train(curr_model, "evalBoard", 0, 50000)
-old_model = tf.keras.models.load_model("models/evalBoard_0")
+old_model = old_model
+old_player = ai_player(old_model)
 
-amplify_data = amplify_training_data(old_model, "2", 100000)
-train_model(curr_model, amplify_data)
-curr_model.save("models/amplify_test_2")
-# curr_model = tf.keras.models.load_model("models/amplify_test_1")
+amplify_archs = [
+    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
+    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
+    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
+    ]
+for i, archs in enumerate(amplify_archs):
+    print(f"amplify step {i}")
+    # Test if the current model performs better with ideal amplification, if not, there is no
+    # gain in trying to amplify it
 
-old_player = ai_player(old_model) 
+    old_player = ai_player(old_model)
+    old_player_ideal_amplify = ai_player_amplified(old_model)
+    ideal_rate = simulateGames(testInitialBoard, old_player_ideal_amplify, old_player, 100, False)
+
+    print(f'ideal amplify rate: {ideal_rate}')
+
+    if(ideal_rate < 0.6):
+        print(f'ideal rate not enough')
+        break
+
+    # Try to learn an amplified version of the model using one of the given archs
+    amplified_data = amplify_training_data(old_model, f'{old_model_name}_{i}')
+
+    best_real_rate = -1
+    best_model = None
+    best_model_name = None
+    for arch in archs:
+        arch_name = arch.__name__
+        print(f'Amplify learning using {arch_name}')
+        curr_model = create_model(arch)
+        train_model(curr_model, amplified_data)
+
+        curr_player = ai_player(curr_model)
+
+        print("Simulating games:")
+        real_rate = simulateGames(testInitialBoard, curr_player, old_player, 100, False)
+
+        print(f"real rate: {real_rate}")
+
+        name = f'amplify_{i}_{arch_name}_rate_{round(real_rate * 100)}'
+        curr_model.save(f"models/{name}")
+
+        if(real_rate > best_real_rate):
+            best_real_rate = real_rate
+            best_model = curr_model
+            best_model_name = name
+    
+    old_model = best_model
+    old_model_name = best_model_name
+
+exit()
+# old_model = tf.keras.models.load_model("models/evalBoard_0")
+
+# amplify_data = amplify_training_data(old_model, "2", 100000)
+# train_model(curr_model, amplify_data)
+# curr_model.save("models/amplify_test_2")
+curr_model = tf.keras.models.load_model("models/amplify_test_2")
+
+old_player = minimax_player(1)
 player = ai_player(curr_model) 
 
-simulateGames(testInitialBoard, player, old_player, 100, True)
+simulateGames(testInitialBoard, player, old_player, 100, False)
 
 
