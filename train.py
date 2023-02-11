@@ -1,7 +1,6 @@
 import numpy as np
 from test import get_test_boards
 from minmax import minimax
-from eval import win_threshold
 from board import testInitialBoard
 import os
 
@@ -12,7 +11,7 @@ def get_train_data(eval_func, size):
 
 def get_minmax_train_data(file_name, eval_func, tsize, vsize, depth, save_file = True):
     print("Generating test data for " + file_name + " size=" + str(tsize) + ", depth " + str(depth))
-    file_name = f'train_data_{file_name}-d{depth}-t{tsize}-v{vsize}.npz'
+    file_name = f'train_data/{file_name}-d{depth}-t{tsize}-v{vsize}.npz'
 
     if(save_file and os.path.isfile(file_name)):
         with np.load(file_name) as data:
@@ -21,7 +20,7 @@ def get_minmax_train_data(file_name, eval_func, tsize, vsize, depth, save_file =
             
     
     def minmax_eval_board(board):
-        (value,_,_) = minimax(board, 1, depth, eval_func, win_threshold)
+        (value,_,_) = minimax(board, 1, depth, eval_func)
         return value
 
     train = get_train_data(minmax_eval_board, tsize)

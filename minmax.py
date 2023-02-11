@@ -1,8 +1,6 @@
 import random
-import numpy as np
-from moves import flip_move, get_all_moves, apply_move, move_str, flip_board, apply_move_inplace, undo_move_inplace
-from view import print_board
-from eval import evalBoard, win_threshold
+from moves import get_all_moves, move_str, apply_move_inplace, undo_move_inplace
+from eval import evalBoard
 
 class Variation:
     def __init__(self, parent, value):
@@ -18,13 +16,14 @@ def variation_str(variation):
 
 
 inf_val = 100000
-def alphabeta(board, color, depth, alpha, beta, eval_func, win_threshold, parent_move):
-    eval = eval_func(board) * color
-    if(depth == 0 or abs(eval) >= win_threshold):
+def alphabeta(board, color, depth, alpha, beta, eval_func, parent_move):
+    if(depth == 0):
+        eval = eval_func(board, color) * color
         return (eval, parent_move, None)
     
     moves = get_all_moves(board, color)
     if(len(moves)==0): 
+        eval = eval_func(board, color) * color
         return (eval, parent_move, None)
     
     value = -inf_val
@@ -37,7 +36,7 @@ def alphabeta(board, color, depth, alpha, beta, eval_func, win_threshold, parent
         undo = apply_move_inplace(board, move)
 
         curr_variation = Variation(parent_move, move) if parent_move != None else None
-        (move_eval, next_variation, _) = alphabeta(board, -color, depth - 1, -beta, -alpha, eval_func, win_threshold, curr_variation)
+        (move_eval, next_variation, _) = alphabeta(board, -color, depth - 1, -beta, -alpha, eval_func, curr_variation)
         move_eval = -move_eval
 
         undo_move_inplace(board, move, undo)
@@ -54,12 +53,12 @@ def alphabeta(board, color, depth, alpha, beta, eval_func, win_threshold, parent
 
     return (value, best_variation, best_move)
 
-def minimax(board, color, depth, eval_func, win_threshold, calc_variation = True):
-    return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, win_threshold, Variation(None, None) if calc_variation else None)
+def minimax(board, color, depth, eval_func, calc_variation = False):
+    return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, Variation(None, None) if calc_variation else None)
 
-def find_best_move_minimax(board, depth):
+def find_best_move_minimax(board, depth, eval_func):
     if(depth < 1):
         raise Exception("Depth should be >= 1")
     
-    (value, best_variation, best_move) = minimax(board, 1, depth, evalBoard, win_threshold, False)
+    (value, best_variation, best_move) = minimax(board, 1, depth, eval_func, False)
     return best_move

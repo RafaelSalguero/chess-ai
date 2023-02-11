@@ -2,10 +2,9 @@ import tensorflow as tf
 import numpy as np
 
 from board import testInitialBoard
-from eval import evalBoard, win_threshold
-from game import auto_player, simulateGames
+from eval import evalBoard
+from game import auto_player, minimax_player, simulateGames
 from train import get_minmax_train_data
-from view import print_board
 from moves import apply_move, flip_board, get_all_moves, move_str
 from minmax import minimax
 
@@ -14,17 +13,18 @@ from minmax import minimax
 # Piece types: 0 Pawn, 1 Knight,  2 Bishop, 3 Rook, 4 Queen, 5 King
 
 def create_model():
-    model = tf.keras.Sequential([
-        tf.keras.Input(shape=(8,8,6)),
-        tf.keras.layers.Conv2D(6, 5, 1, padding="same", activation="swish"),
-        tf.keras.layers.Conv2D(2, 3, 1, padding="same", activation="swish"),
-        tf.keras.layers.MaxPool2D(),
+    model = tf.keras.Sequential()
+    model.add(tf.keras.Input(shape=(8,8,6)))
+    model.add(tf.keras.layers.Conv2D(6,3, padding="same"))
+    model.add(tf.keras.layers.Conv2D(5,7, padding="same"))
+    model.add(tf.keras.layers.Conv2D(4,17, padding="same"))
 
-        tf.keras.layers.Dense(32, activation="swish"),
+    model.add(tf.keras.layers.Flatten())
 
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(1),
-    ])
+    model.add(tf.keras.layers.Dense(128, activation = "swish"))
+    model.add(tf.keras.layers.Dense(8, activation = "swish"))
+
+    model.add(tf.keras.layers.Dense(1))
 
     print(model.summary())
 
@@ -37,27 +37,27 @@ def train_model(model, data):
 
     print("train size: " + str(x_train.shape[0]))
 
-    for i in range(0,20):
-        print_board(x_train[i])
-        print("y_train: " + str(y_train[i]))
-
-    model.fit(x_train, y_train,  epochs=100, callbacks=[
-         tf.keras.callbacks.EarlyStopping("loss", min_delta=5, patience=10, mode="min")
+    model.fit(x_train, y_train,  epochs=1000, callbacks=[
+         tf.keras.callbacks.EarlyStopping("loss", min_delta=10, patience=5, mode="min")
     ])
 
     model.evaluate(x_test,  y_test, verbose=2)
 
 
+# Evals the position for white to play
 @tf.function    
 def internal_model_eval(model, x):
     return model(x)
     
-def ai_eval_board(model, board):
-    return internal_model_eval(model, board.reshape((1,8,8,6))).numpy()[0][0]
+def ai_eval_board(model, board, color):
+    if(color == -1):
+        board = flip_board(board)
+
+    return internal_model_eval(model, board.reshape((1,8,8,6))).numpy()[0][0] * color
 
 def train_minmax_model(model, eval_func, depth):
     def minmax_eval_board(board):
-            (value,) = minimax(board, 1, depth, eval_func, win_threshold)
+            (value,) = minimax(board, 1, depth, eval_func)
             return value
     train_model(model, minmax_eval_board)
      
@@ -81,14 +81,20 @@ def find_best_move_ai(model, board, verbose = False):
         
     return moves[best]
 
-def initial_train(model, name, depth = 0, size=100000):
+def initial_train(model, name, depth = 0, size=50000):
     data = get_minmax_train_data("evalBoard", evalBoard, size, 250, depth)
     train_model(model, data)
     model.save(f'models/{name}_{depth}')
 
+def amplify_training_data(model, name, size=50000):
+    def eval(board, color):
+        return ai_eval_board(model, board, color)
+    
+    return get_minmax_train_data(f'amplify_{name}', eval, size, 250, 1, True)
+
 
 # creates an AI player for the given model
-def ai_player(model, verbose = False):
+def ai_player(model, depth = 1, verbose = False):
     def find_best(board):
         return find_best_move_ai(model, board, verbose=verbose)
     
@@ -98,15 +104,24 @@ def ai_player(model, verbose = False):
     return player
 
 
-# train with 0 data:
+# old_model = create_model()
+curr_model = create_model()
+
+# Train with the initial eval function:
+# initial_train(old_model, "evalBoard", 0, 10000)
+# curr_model = tf.keras.models.load_model("models/evalBoard_0")
+
+# initial_train(curr_model, "evalBoard", 0, 50000)
+old_model = tf.keras.models.load_model("models/evalBoard_0")
+
+amplify_data = amplify_training_data(old_model, "2", 100000)
+train_model(curr_model, amplify_data)
+curr_model.save("models/amplify_test_2")
+# curr_model = tf.keras.models.load_model("models/amplify_test_1")
+
+old_player = ai_player(old_model) 
+player = ai_player(curr_model) 
+
+simulateGames(testInitialBoard, player, old_player, 100, True)
 
 
-old_model = tf.keras.models.load_model('models/evalBoard_0')
-
-curr_model = tf.keras.models.load_model('models/evalBoard_1')
-initial_train(curr_model,'evalBoard', 1, 50000)
-
-old_player = ai_player(curr_model)
-player = ai_player(old_model)
-
-simulateGames(testInitialBoard, old_player, player, 50, True)

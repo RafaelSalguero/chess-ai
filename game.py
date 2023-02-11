@@ -2,7 +2,7 @@ from board import initialBoard, testInitialBoard
 from view import print_board
 from moves import move_str, flip_board, flip_move, get_all_moves, str_move, apply_move
 from minmax import minimax, find_best_move_minimax
-from eval import evalBoard, win_threshold, evalWin
+from eval import evalBoard, evalWin
 import numpy as np
 
 def console_player(board, color):
@@ -39,9 +39,9 @@ def auto_player(board, color, find_best_move):
     return best_move
 
 
-def minimax_player(depth):
+def minimax_player(depth, eval_func = evalBoard):
     def player(board, color):
-        return auto_player(board, color, lambda board: find_best_move_minimax(board, depth))
+        return auto_player(board, color, lambda board: find_best_move_minimax(board, depth, eval_func))
     
     return player
 
@@ -61,7 +61,7 @@ def play(board, color, white_player, black_player, print_evals = True,show_board
 
         if(print_evals):
             eval_depths = [0, 1, 2, 3, 4]
-            evals = np.array(list(map(lambda depth: minimax(board, color, depth, evalBoard, win_threshold), eval_depths)))
+            evals = np.array(list(map(lambda depth: minimax(board, color, depth, evalBoard), eval_depths)))
             print("minmax eval", evals)
 
         moves = get_all_moves(board, color)

@@ -1,5 +1,6 @@
 import numpy as np
 from board import pawn, emptyCell, king, rook, knight, bishop, queen
+from eval import evalWin
 # A move is represented as  [[y_start, x_start], [y_end, x_end]]
 # All moves are calculated for white, the board is flipped when calculating black moves
 
@@ -145,7 +146,12 @@ def get_vector_moves(board, pos, vectors, color):
     return ret
 
 def get_all_moves(board, color):
+    
     ret = []
+
+    if(evalWin(board) != 0): 
+        return ret
+    
     for y in range(0, 8):
         for x in range(0, 8):
             pos = np.array([y, x])

@@ -6,12 +6,9 @@ pieceValues = np.array([
     3, # knight
     3, # bishop
     9, # queen
-    300, # king
+    150, # king
     1, # pawn
 ])
-
-# Any eval greater than 150 is considered a win
-win_threshold = 150
 
 def evalCell(cell):
     return np.dot(cell, pieceValues)
@@ -20,5 +17,8 @@ def evalCell(cell):
 def evalWin(board):
     return np.dot(np.sum(board, axis=(0,1)), king)
 
-def evalBoard(board):
+def evalBoard(board, color):
+    # color doesn't matter in static eval but we still keep it to make this function
+    # compatible with minimax
+    
     return np.sum(np.dot(board, pieceValues))

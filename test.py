@@ -1,8 +1,5 @@
 import random
-import numpy as np
-from moves import flip_move, get_all_moves, apply_move, move_str, flip_board, apply_move_inplace, undo_move_inplace
-from view import print_board
-from eval import evalBoard, win_threshold
+from moves import get_all_moves, apply_move, flip_board
 from math import ceil
 
 def get_test_boards(board, color, depth, count, ret = []):
