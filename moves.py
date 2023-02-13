@@ -7,9 +7,15 @@ from eval import evalWin
 # Returns true if the position is inside the board, false otherwhite
 col_names = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
+def rank_str(rank):
+    return str(8 - rank)
+
+def file_str(file): 
+    return col_names[file]
+
 # Convert a pos to string
 def pos_str(pos):
-    return col_names[pos[1]] + str(8 - pos[0])
+    return file_str(pos[1]) + rank_str(pos[0])
 
 def flip_pos(pos):
     return np.array([7 - pos[0], pos[1]])
@@ -23,6 +29,49 @@ def str_pos(str):
 
 def move_str(move):
     return pos_str(move[0]) + pos_str(move[1])
+
+def is_piece(cell, piece, color = None):
+    c = cell * [1,1,1,1,1,1]
+
+    if(color == None):
+        c = np.abs(c)
+    else:
+        c = c * color
+    
+    return np.array_equal(c, piece)
+
+def get_extra_bit(cell):
+    return cell[6]
+
+# Converts a move to algebraic notation
+def move_str_an(board, all_moves, move):
+    orig = cell(board, move[0])
+    name =  "K" if is_piece(orig, king) else "Q" if is_piece(orig, queen) else  "R" if is_piece(orig, rook) else  "N" if is_piece(orig, knight) else ""
+    take = not is_empty_cell(board, move[1])
+    take_str = 'x' if take else ''
+    dest_str = pos_str(move[1])
+
+    if(name == ""):
+        if(take): return col_names[move[0][1]] + take_str + dest_str
+        return dest_str
+    
+    # If two pices from the same type can move to the same dest:
+    conflicts = filter(lambda m: not np.array_equal(m, move) and np.array_equal(cell(board, m[0]), orig) and np.array_equal(m[1], move[1]), all_moves)
+    
+    # If there are any conflicts in the same file:
+    if(any(filter(lambda m: m[0][1] == move[0][1], conflicts))):
+        return name + rank_str(move[0][0]) + take_str + dest_str
+    elif (any(conflicts)):
+        return name + file_str(move[0][0]) + take_str + dest_str
+    
+    return name + take_str + dest_str
+
+def str_move_an(board, all_moves, str):
+    for move in all_moves:
+        if(move_str_an(board, all_moves, move) == str):
+            return move
+        
+    raise Exception("Move was not found")
 
 def str_move(str):
     return np.array([str_pos(str[0:2]), str_pos(str[2:4])])
@@ -92,7 +141,7 @@ def get_pawn_moves(board, pos, color):
     # move 2 forward:
     start_y = 6 if color==1 else 1
     next_pos = pos + forward + forward
-    if(pos[0] == start_y and is_empty_cell(board, next_pos)):
+    if(pos[0] == start_y and is_empty_cell(board, pos + forward) and is_empty_cell(board, next_pos)):
         if(not pos_inside(next_pos)):
             raise Exception("pos")
         ret.append(next_pos)
@@ -145,6 +194,30 @@ def get_vector_moves(board, pos, vectors, color):
         ret += get_ray_moves(board, pos, vector, color)
     return ret
 
+def get_knight_moves(board, pos, color):
+    all_next_pos = pos + np.array([
+        [2, 1],
+        [1, 2],
+
+        [-2, 1],
+        [-1, 2],
+
+        [-2, -1],
+        [-1, -2],
+
+        [2, -1],
+        [1, -2],
+        ])
+
+    ret = []
+    for next_pos in all_next_pos:
+        if(not pos_inside(next_pos) or has_piece(board, next_pos, color)):
+            continue
+        
+        ret.append(next_pos)
+
+    return ret
+
 def get_all_moves(board, color):
     
     ret = []
@@ -155,14 +228,20 @@ def get_all_moves(board, color):
     for y in range(0, 8):
         for x in range(0, 8):
             pos = np.array([y, x])
-            cell = board[y, x] * color
+            cell = board[y, x]
             curr_ret = []
-            if(np.array_equal(cell, pawn)):
+            if(is_piece(cell, pawn, color)):
                 curr_ret += get_pawn_moves(board, pos, color)
-            elif (np.array_equal(cell, king)):
+            elif (is_piece(cell, knight, color)):
+                curr_ret += get_knight_moves(board, pos, color)
+            elif (is_piece(cell, king, color)):
                 curr_ret += get_king_moves(board, pos, color)
-            elif (np.array_equal(cell, queen)):
+            elif (is_piece(cell, queen, color)):
                 curr_ret += get_vector_moves(board, pos, queen_vectors, color)
+            elif (is_piece(cell, bishop, color)):
+                curr_ret += get_vector_moves(board, pos, bishop_vectors, color)
+            elif (is_piece(cell, rook, color)):
+                curr_ret += get_vector_moves(board, pos, rook_vectors, color)
 
             ret += list(map(lambda np: [pos, np], curr_ret))
     

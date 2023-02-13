@@ -2,14 +2,14 @@ import tensorflow as tf
 import numpy as np
 from ai_arch import arch_a0, arch_a1_c0, arch_a1_c1, arch_a1_c2, arch_a1_d0, arch_a1_d1
 
-from board import testInitialBoard
+from board import initialBoard
 from eval import evalBoard
 from game import auto_player, minimax_player, simulateGames
 from train import get_minmax_train_data
 from moves import apply_move, flip_board, get_all_moves, move_str
 from minmax import minimax
 
-
+import os
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
 
@@ -80,7 +80,7 @@ def initial_train(model, name, depth = 0, size=50000):
     train_model(model, data)
     model.save(f'models/{name}_{depth}')
 
-def amplify_training_data(model, name, size=50000):
+def amplify_training_data(model, name, size=100000):
     def eval(board, color):
         return ai_eval_board(model, board, color)
     
@@ -102,76 +102,93 @@ def ai_player_amplified(model, verbose = False):
         return ai_eval_board (model, board, color)
     return minimax_player(2, eval)
 
-
-old_model = create_model(arch_a0)
-old_model_name = "evalBoard_0"
-# Train with the initial eval function:
-initial_train(old_model, "evalBoard", 0, 10000)
-
-old_model = old_model
-old_player = ai_player(old_model)
-
-amplify_archs = [
-    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
-    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
-    [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2],
-    ]
-for i, archs in enumerate(amplify_archs):
-    print(f"amplify step {i}")
-    # Test if the current model performs better with ideal amplification, if not, there is no
-    # gain in trying to amplify it
-
-    old_player = ai_player(old_model)
-    old_player_ideal_amplify = ai_player_amplified(old_model)
-    ideal_rate = simulateGames(testInitialBoard, old_player_ideal_amplify, old_player, 100, False)
-
-    print(f'ideal amplify rate: {ideal_rate}')
-
-    if(ideal_rate < 0.6):
-        print(f'ideal rate not enough')
-        break
-
-    # Try to learn an amplified version of the model using one of the given archs
-    amplified_data = amplify_training_data(old_model, f'{old_model_name}_{i}')
-
-    best_real_rate = -1
-    best_model = None
-    best_model_name = None
-    for arch in archs:
-        arch_name = arch.__name__
-        print(f'Amplify learning using {arch_name}')
-        curr_model = create_model(arch)
-        train_model(curr_model, amplified_data)
-
-        curr_player = ai_player(curr_model)
-
-        print("Simulating games:")
-        real_rate = simulateGames(testInitialBoard, curr_player, old_player, 100, False)
-
-        print(f"real rate: {real_rate}")
-
-        name = f'amplify_{i}_{arch_name}_rate_{round(real_rate * 100)}'
-        curr_model.save(f"models/{name}")
-
-        if(real_rate > best_real_rate):
-            best_real_rate = real_rate
-            best_model = curr_model
-            best_model_name = name
+def run():
+    old_model_name = "evalBoard_0"
+    # Train with the initial eval function:
     
-    old_model = best_model
-    old_model_name = best_model_name
+    if(os.path.exists(f'models/{old_model_name}')):
+        old_model = tf.keras.models.load_model(f'models/{old_model_name}')
+    else:
+        old_model = create_model(arch_a0)
+        initial_train(old_model, "evalBoard", 0, 10000)
 
-exit()
+    old_model = old_model
+    old_player = ai_player(old_model)
+
+    amplify_archs = [
+        [arch_a1_c2],
+        [arch_a1_c2],
+        [arch_a1_c2],
+        [arch_a1_c2],
+        [arch_a1_c2],
+        [arch_a1_c2],
+        ]
+    for i, archs in enumerate(amplify_archs):
+        print(f'old model: {old_model_name}')
+        print(f"amplify step {i}")
+
+        if(len(archs) == 0):
+            print(f"skipping level {i}")
+            continue
+        # Test if the current model performs better with ideal amplification, if not, there is no
+        # gain in trying to amplify it
+
+        old_player = ai_player(old_model)
+        old_player_ideal_amplify = ai_player_amplified(old_model)
+        ideal_rate = simulateGames(initialBoard, old_player_ideal_amplify, old_player, 100, False)
+
+        print(f'ideal amplify rate: {ideal_rate}')
+
+        if(ideal_rate < 0.6):
+            print(f'ideal rate not enough')
+            break
+
+        # Try to learn an amplified version of the model using one of the given archs
+        amplified_data = amplify_training_data(old_model, f'{old_model_name}_{i}')
+
+        best_real_rate = -1
+        best_model = old_model
+        best_model_name = old_model
+        for arch in archs:
+            arch_name = arch.__name__
+            print(f'Amplify learning using {arch_name}')
+            curr_model = create_model(arch)
+            train_model(curr_model, amplified_data)
+
+            curr_player = ai_player(curr_model)
+
+            print("Simulating games:")
+            real_rate = simulateGames(initialBoard, curr_player, old_player, 100, False)
+
+            print(f"real rate: {real_rate}")
+
+            name = f'amplify_{i}_{arch_name}_rate_{round(real_rate * 100)}'
+            curr_model.save(f"models/{name}")
+
+            if(real_rate > best_real_rate):
+                best_real_rate = real_rate
+                best_model = curr_model
+                best_model_name = name
+        
+        old_model = best_model
+        old_model_name = best_model_name
+
+        if(best_real_rate < 0.55):
+            print(f'best_real_rate {best_real_rate} not enogh for next step')
+            continue
+
+run()
+# exit()
 # old_model = tf.keras.models.load_model("models/evalBoard_0")
 
 # amplify_data = amplify_training_data(old_model, "2", 100000)
 # train_model(curr_model, amplify_data)
 # curr_model.save("models/amplify_test_2")
-curr_model = tf.keras.models.load_model("models/amplify_test_2")
+# curr_model = tf.keras.models.load_model("models/amplify_test_2")
 
-old_player = minimax_player(1)
-player = ai_player(curr_model) 
+# old_player = minimax_player(1)
+# player = ai_player(curr_model) 
 
-simulateGames(testInitialBoard, player, old_player, 100, False)
+# simulateGames(testInitialBoard, player, old_player, 100, False)
 
 

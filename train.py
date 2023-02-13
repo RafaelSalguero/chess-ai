@@ -1,11 +1,11 @@
 import numpy as np
 from test import get_test_boards
 from minmax import minimax
-from board import testInitialBoard
+from board import initialBoard
 import os
 
 def get_train_data(eval_func, size):
-    x_train = np.array(get_test_boards(testInitialBoard, 1, 250, size))
+    x_train = np.array(get_test_boards(initialBoard, 1, 250, size))
     y_train = np.array(list(map(eval_func, x_train)))
     return (x_train, y_train)
 

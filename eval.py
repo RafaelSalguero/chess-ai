@@ -7,7 +7,7 @@ pieceValues = np.array([
     3, # bishop
     9, # queen
     150, # king
-    1, # pawn
+    1 # pawn
 ])
 
 def evalCell(cell):

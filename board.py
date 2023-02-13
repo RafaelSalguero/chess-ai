@@ -30,7 +30,7 @@ initialBoard = np.array([
     piecesRank
 ])
 
-testInitialBoard = np.array([
+testInitialBoard_old = np.array([
     -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, king]),
     -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, pawn, emptyCell]),
     emptyRank,
