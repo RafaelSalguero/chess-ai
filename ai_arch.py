@@ -5,7 +5,7 @@ import tensorflow as tf
 def arch_a0():
     return tf.keras.Sequential([
         tf.keras.Input(shape=(8,8,6)),
-        tf.keras.layers.Conv2D(1, 1),
+        tf.keras.layers.Conv2D(3, 1),
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(1)
     ])

@@ -31,7 +31,7 @@ def train_model(model, data):
 
     print("train size: " + str(x_train.shape[0]))
 
-    model.fit(x_train, y_train, epochs=1000, callbacks=[
+    model.fit(x_train, y_train, epochs=1000, batch_size=32, callbacks=[
          tf.keras.callbacks.EarlyStopping("loss", min_delta=5, patience=20, mode="min")
     ])
 
@@ -80,7 +80,7 @@ def initial_train(model, name, depth = 0, size=50000):
     train_model(model, data)
     model.save(f'models/{name}_{depth}')
 
-def amplify_training_data(model, name, size=100000):
+def amplify_training_data(model, name, size=50000):
     def eval(board, color):
         return ai_eval_board(model, board, color)
     
