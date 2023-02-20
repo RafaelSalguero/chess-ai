@@ -9,28 +9,35 @@ import tensorflow as tf
 # All moves are calculated for white, the board is flipped when calculating black moves
 
 # Returns true if the position is inside the board, false otherwhite
-col_names = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+col_names = 'abcdefgh'
 
+@njit
 def rank_str(rank):
     return str(8 - rank)
 
+@njit
 def file_str(file): 
     return col_names[file]
 
 # Convert a pos to string
+@njit
 def pos_str(pos):
     return file_str(pos[1]) + rank_str(pos[0])
 
+@njit
 def flip_pos(pos):
     return np.array([7 - pos[0], pos[1]])
 
+@njit
 def flip_move(move):
     return np.array(list(map(flip_pos, move)))
 
 # Convert string to position
+@njit
 def str_pos(str):
     return np.array([8 - int(str[1]), col_names.index(str[0])])
 
+@njit
 def move_str(move):
     return pos_str(move[0]) + pos_str(move[1])
 
@@ -52,6 +59,7 @@ def is_piece(cell, piece, color = None, strict = False):
     return c == piece
 
 # Converts a move to algebraic notation
+@njit
 def move_str_an(board, all_moves, move):
     orig = cell(board, move[0])
     color = np.abs(orig)
@@ -72,15 +80,33 @@ def move_str_an(board, all_moves, move):
         return dest_str
     
     # If two pices from the same type can move to the same dest:
-    conflicts = filter(lambda m: not np.array_equal(m, move) and np.array_equal(cell(board, m[0]), orig) and np.array_equal(m[1], move[1]), all_moves)
-    
+    conflict = False
+    conflict_same_file = False
+    for m in all_moves:
+        if(np.array_equal(m[0], move[0]) and np.array_equal(m[1], move[1])):
+            continue
+
+        if(np.array_equal(cell(board, m[0]), orig) and np.array_equal(m[1], move[1])):
+            conflict = True
+
+            if(m[0][1] == move[0][1]):
+                conflict_same_file = True
+            
     # If there are any conflicts in the same file:
-    if(any(filter(lambda m: m[0][1] == move[0][1], conflicts))):
+    if(conflict_same_file):
         return name + rank_str(move[0][0]) + take_str + dest_str
-    elif (any(conflicts)):
+    elif (conflict):
         return name + file_str(move[0][0]) + take_str + dest_str
     
     return name + take_str + dest_str
+
+@njit
+def moves_str_an(board, moves):
+    ret = []
+    for move in moves:
+        ret.append(move_str_an(board, moves, move))
+
+    return ret
 
 def str_move_an(board, all_moves, str):
     for move in all_moves:
@@ -89,6 +115,7 @@ def str_move_an(board, all_moves, str):
         
     raise Exception("Move was not found")
 
+@njit
 def str_move(str):
     return np.array([str_pos(str[0:2]), str_pos(str[2:4])])
 

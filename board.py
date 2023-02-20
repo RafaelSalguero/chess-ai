@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import itertools as it
-
+from numba import njit
 
 emptyCell = np.int32(0)
 
@@ -32,6 +32,10 @@ initialBoard = np.array([
     pawnsRank,
     piecesRank
 ])
+
+@njit
+def getInitialBoard():
+    return initialBoard
 
 testInitialBoard_old = np.array([
     -np.array([ emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, emptyCell, king]),

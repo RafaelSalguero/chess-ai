@@ -1,18 +1,11 @@
 import tensorflow as tf
 import numpy as np
-from ai_arch import arch_a0, arch_a1_c0, arch_a1_c1, arch_a1_c2, arch_a1_d0, arch_a1_d1
 
-from board import initialBoard
-from eval import evalBoard
-from game import auto_player, minimax_player, simulateGames
-from train import get_minmax_train_data, get_sim_games
-from moves import apply_move, flip_board, get_all_moves, move_str
-from minmax import minimax, minimax_eval_board
+from train import get_sim_games
 
 import os
 
-from utils import onehot_encode_board, softmax
-from view import print_board
+from utils import onehot_encode_board
 # Disable GPU training:
 # tf.config.set_visible_devices([], 'GPU')
 
@@ -21,9 +14,21 @@ from view import print_board
 
 print("generating test data")
 
+def get_train_data(depth, max_iter, size, cache = False):
+    file_name = f'train_data/get_sim_games_{depth}_{max_iter}_{size}.npz'
+    if(cache and os.path.isfile(file_name)):
+        with np.load(file_name) as data:
+            return (data['x'], data['y'])
+        
+    (x, y) = get_sim_games(depth, max_iter, size=size, verbose= False)
+
+    if (cache):
+        np.savez_compressed(file_name, x=x, y=y)
+    return (x, y)
+
 # data = np.load("train_data/get_sim_games_2_16384.npz")
-(x_train, y_train) = get_sim_games(minimax_eval_board(0, 1000000, evalBoard), size=10000, verbose= False)
-(x_test, y_test) = get_sim_games(minimax_eval_board(0, 1000000, evalBoard), size=1024, verbose= False)
+(x_train, y_train) = get_train_data(0, 102, 50000)
+(x_test, y_test) = get_train_data(0, 50000, 1000)
 
 # np.savez_compressed("train_data/get_sim_games_2_16384", x_train = x_train, y_train=y_train)
 x_train = onehot_encode_board(x_train)

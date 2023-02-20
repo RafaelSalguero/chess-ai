@@ -1,13 +1,14 @@
 import numpy as np
 from eval import evalBoard, evalWin
-from moves import apply_move, flip_board, get_all_moves, move_str_an
+from moves import apply_move, apply_move_inplace, flip_board, get_all_moves, move_str_an, moves_str_an, undo_move_inplace
 from test import get_test_boards
-from minmax import minimax
-from board import initialBoard
+from minmax import iterative_deepening, minimax
+from board import getInitialBoard, initialBoard
 import os
 
 from utils import get_np_hash, softmax
 from view import print_board
+from numba import njit, prange
 
 def get_test_board_train_data(size):
     print("generating test boards...")
@@ -51,42 +52,73 @@ def get_minmax_train_data(file_name, eval_func, tsize, vsize, depth, save_file =
         
     return (train, test)
 
-def get_sim_games(eval_func = evalBoard, size=128, verbose=True):
-    board = initialBoard
+# Chooses a random index in probs where the probability is the value, the sum of probs should be 1
+@njit
+def random_choice(probs):
+    rn = np.random.rand()
+    min = 0
+    for i, p in enumerate(probs):
+        max = min + p
+        if(rn >= min and rn < max):
+            return i
+        min = max
+        
+    return len(probs) - 1
+
+
+@njit(parallel=True)
+def get_sim_games(depth, max_iter, size=128, threads = 8, verbose=True):
+    if(size % threads != 0):
+        raise Exception("Size must be a multiple of threads")
+    
+    boards = np.empty((size, 8, 8), dtype=np.int32)
+    y_evals = np.empty(size)
+
+    step = size // threads
+    for i in prange(threads):
+        dest_index = i * step
+        get_sim_games_inplace(depth, max_iter, boards, y_evals, dest_index, f'{i}/{threads} - ', size / threads, verbose)
+
+    return (boards, y_evals)
+@njit
+def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, prefix = '', size=128, verbose=True):
+    initial_copy = np.copy(initialBoard)
+    board = np.copy(initial_copy)
     
     added = set()
-    ret = []
-    y_evals = []
-
     color = 1
-
     eval = 0
 
     not_added_counter = 0
 
     prob_ratio = 1
-    while True:
 
+    index = 0
+    while True:
         train_board = board if color == 1 else flip_board(board)
         train_board_hash = get_np_hash(train_board)
         if(not train_board_hash in added):
             not_added_counter = 0
             added.add(train_board_hash)
-            ret.append(train_board)
-            y_evals.append(eval)
-            if(len(ret) % 1000 == 0):
-                print(f"sim_games count: {len(ret)}")
+            dest_boards[index + dest_index] = train_board
+            dest_evals[index + dest_index] = eval
+            index += 1
+
+            if(index >= size):
+                break
+
+            if(index % 100 == 0):
+                print(f"{prefix}sim_games count: {index}")
         else:
             not_added_counter += 1
             if(not_added_counter > 100):
                 not_added_counter=0
                 prob_ratio *= 0.99
-                print(f'prob ratio: {prob_ratio}')
+                print(f'{prefix}prob ratio: ' + str(int(round(prob_ratio * 100))))
 
         if(verbose):
             print_board(board)
-        if(len(ret) >= size):
-            break
+        
 
         moves = get_all_moves(board, color)
 
@@ -94,26 +126,27 @@ def get_sim_games(eval_func = evalBoard, size=128, verbose=True):
             if(verbose):
                 print(f'win: {evalWin(board)}')
             color = 1
-            board = initialBoard
+            board = initial_copy
             continue
-            
-        next_boards = list(map(lambda move: apply_move(board, move), moves))
+        
+        next_evals = []
         next_color = -color
-        next_evals = list(map(lambda board: eval_func(board, next_color), next_boards))
+
+        for move in moves:
+            undo = apply_move_inplace(board, move)
+            next_evals.append(iterative_deepening(depth, max_iter, board, next_color))
+            undo_move_inplace(board, move, undo)
 
         if(verbose):
             print(next_evals)
         probs = softmax(-np.array(next_evals) * prob_ratio)
-        best = np.random.choice(len(moves), size=1, p = probs)[0]
+        best = random_choice(probs)
 
         if(verbose):
-            moves_s = list(map(lambda move: move_str_an(board, moves, move), moves))
+            moves_s = moves_str_an(board, moves)
             print(moves_s)
-            print(f'best: {moves_s[best]} ({next_evals[best]})')
+            print(f'{prefix}best: {moves_s[best]} ({next_evals[best]})')
 
-        board = next_boards[best]
+        board = apply_move(board, moves[best])
         color = next_color
-        eval = next_evals[best]
-
-    return (np.array(ret), np.array(y_evals))
-    
+        eval = next_evals[best]    

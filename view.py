@@ -1,11 +1,22 @@
 import numpy as np
-from colorama import Fore, Back
 from board import rook, knight, bishop, queen, king, pawn, emptyCell, rook_moved, king_moved
 from moves import col_names
+from numba import njit
 
-black_chars = ['♜', '♜', '♞', '♝', '♛', '♚', '♚', '♟︎', ' ']
-white_chars = ['♖', '♖', '♘', '♗', '♕', '♔', '♔', '♙', ' ']
 ascii_chars = 'rnbqkp '
+
+CSI = '\033['
+
+@njit
+def code_to_chars(code):
+    return CSI + str(code) + 'm'
+
+BACK_GREEN = code_to_chars(42)
+BACK_WHITE = code_to_chars(47)
+BACK_RESET = code_to_chars(49)
+
+black_chars = '♜♜♞♝♛♚♚♟ ' 
+white_chars = '♖♖♘♗♕♔♔♙ '
 
 def board_to_ascii(s):
     for i, x in enumerate(black_chars):
@@ -17,6 +28,7 @@ def board_to_ascii(s):
 
 all_pieces = np.array([rook, rook_moved, knight, bishop, queen, king, king_moved, pawn, emptyCell])
 
+@njit
 def print_piece(piece, on_white):
     black = piece < 0
     piece = np.abs(piece)
@@ -24,7 +36,7 @@ def print_piece(piece, on_white):
     pieceIndex = np.where(all_pieces == piece)[0][0]
 
     char =  (black_chars if black else white_chars)[pieceIndex]
-    print(' ' + char + ' ', end='')
+    print(' ' + char + ' ', '')
 
 def parse_piece(piece):
     pchar = piece.strip(" ")
@@ -40,13 +52,14 @@ def parse_piece(piece):
     
     raise Exception(f"Cant parse piece '{piece}'")
 
+@njit
 def print_rank(rank, white):
     color = white
     for piece in rank:
-        print(Back.WHITE if color else Back.GREEN, end='')
+        print(BACK_WHITE if color else BACK_GREEN, '')
         print_piece(piece, color)
         color = not color
-    print(Back.RESET)
+    print(BACK_RESET)
 
 def parse_rank(rank):
     rank = rank.lstrip(" ")
@@ -58,18 +71,19 @@ def parse_rank(rank):
     
     return np.array(ret)
 
+@njit
 def print_board(board):
     color = True
     rn = 8
     for rank in board:
-        print(rn, end='')
+        print(rn, '')
         rn = rn - 1
         print_rank(rank, color)
         color = not color
     
-    print(' ', end='')
+    print(' ', '')
     for col in col_names:
-        print(' ' + col + ' ', end='')
+        print(' ' + col + ' ', '')
     print()
 
 def  parse_board(board):

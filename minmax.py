@@ -59,19 +59,17 @@ def alphabeta(board, color, depth, alpha, beta, eval_func, parent_move):
 def minimax(board, color, depth, eval_func, calc_variation = False):
     return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, Variation(None, None) if calc_variation else None)
 
-def minimax_eval_board(max_depth, max_iter, eval_func):
-    def minmax_eval(board, color):
-        value = 0
-        rem_iters = max_iter
-        for depth in range(0, max_depth + 1):
-            (value, _, _, iters) = alphabeta(board, color, depth, -inf_val, inf_val, eval_func, None)
-            rem_iters -= iters
-            if(rem_iters <= 0):
-                break
-            
-        return value
-    
-    return minmax_eval
+@njit
+def iterative_deepening(max_depth, max_iter, board, color):
+    value = 0
+    rem_iters = max_iter
+    for depth in range(0, max_depth + 1):
+        (value, _, _, iters) = alphabeta(board, color, depth, -inf_val, inf_val, evalBoard, None)
+        rem_iters -= iters
+        if(rem_iters <= 0):
+            break
+        
+    return value
 
 def find_best_move_minimax(board, depth, eval_func):
     if(depth < 1):
