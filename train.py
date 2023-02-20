@@ -88,7 +88,7 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
     initial_copy = np.copy(initialBoard)
     board = np.copy(initial_copy)
     
-    # added = set()
+    added = set()
     color = 1
     eval = 0
 
@@ -101,10 +101,9 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
     while True:
         train_board = board if color == 1 else flip_board(board)
         train_board_hash = get_np_hash(train_board)
-        #  not train_board_hash in added
-        if(True):
+        if(not train_board_hash in added):
             not_added_counter = 0
-            # added.add(train_board_hash)
+            added.add(train_board_hash)
             dest_boards[index + dest_index] = train_board
             dest_evals[index + dest_index] = eval
             index += 1
