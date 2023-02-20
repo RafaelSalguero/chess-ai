@@ -1,5 +1,5 @@
 import numpy as np
-from ai import internal_model_eval
+from ai_old import internal_model_eval
 
 from moves import apply_move, get_all_moves
 

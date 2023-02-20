@@ -1,0 +1,3 @@
+numba
+colorama
+tensorflow-macos

@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from ai import ai_player
+from ai_old import ai_player
 from ai_arch import arch_a1_c0, arch_a1_c1, arch_a1_c2, arch_a1_d0, arch_a1_d1
 from game import simulateGames
 from board import testInitialBoard

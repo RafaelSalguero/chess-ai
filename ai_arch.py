@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 # Different architectures to test:
-
+import numpy as np
 def arch_a0():
     return tf.keras.Sequential([
         tf.keras.Input(shape=(8,8,6)),

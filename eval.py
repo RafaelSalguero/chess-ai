@@ -1,24 +1,34 @@
 import numpy as np
-from board import king
+from board import king, king_moved
+from numba import njit
 
 pieceValues = np.array([
     5, # rook 
+    5, # rook_moved
     3, # knight
     3, # bishop
     9, # queen
     150, # king
+    150, # king_moved
     1 # pawn
-])
+], dtype=np.float32)
 
+@njit
 def evalCell(cell):
     return np.dot(cell, pieceValues)
 
 # Returns 1 if white wins, -1 if black wins, 0 if still no winner
+@njit
 def evalWin(board):
-    return np.dot(np.sum(board, axis=(0,1)), king)
+    s = np.sign(board)
+    a = s * board
+    return np.sum((a == king) * s) + np.sum((a == king_moved) * s)
 
+@njit
 def evalBoard(board, color):
-    # color doesn't matter in static eval but we still keep it to make this function
-    # compatible with minimax
-    
-    return np.sum(np.dot(board, pieceValues))
+    """Evaluates the board from the perspective of the given color. Example, color 1 is positive for a better position for white, color -1 is positive for a better position for black
+    """
+    s = np.sign(board)
+    a = s * board
+
+    return np.sum(((a == 1) * 5 + (a == 2) * 5 + (a == 3) * 3 + (a == 4) * 3 + (a == 5) * 9 + (a == 6) * 150 + (a == 7) * 150 + (a == 8) * 1) * s) * color

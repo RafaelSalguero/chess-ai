@@ -2,6 +2,7 @@ import random
 from moves import get_all_moves, apply_move, flip_board
 from math import ceil
 
+# Returns an aprox number of test boards
 def get_test_boards(board, color, depth, count, ret = []):
     if(count <=0):
         return

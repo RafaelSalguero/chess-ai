@@ -1,28 +1,13 @@
-from game import minimax_player
-from moves import apply_move, flip_board, move_str
-from view import parse_board, print_board, black_chars
-from ai import ai_player, curr_model, ai_eval_board
+from eval import evalBoard
+from minmax import minimax_eval_board
+from train import get_sim_games
+from view import parse_board, print_board
 
-board = parse_board('''
-8                        
-7                        
-6             ♚          
-5                        
-4    ♙  ♔                
-3                        
-2                   ♟︎    
-1                        
-  a  b  c  d  e  f  g  h 
-''')
+from timeit import timeit
+(x_train, y_train) = get_sim_games(minimax_eval_board(100, 5, evalBoard), size=1024, verbose= False)
 
-print_board(board)
+for i, x in enumerate(x_train):
+    y = y_train[i]
 
-player = ai_player(curr_model, True)
-
-next_move = player(board, 1)
-print(move_str(next_move))
-
-next_board = flip_board(apply_move(board, next_move))
-
-print_board(next_board)
-print("eval", ai_eval_board(curr_model, next_board))
+    print_board(x)
+    print(f'eval: {y}')

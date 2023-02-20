@@ -2,18 +2,21 @@ import tensorflow as tf
 import numpy as np
 import itertools as it
 
-def piece(index):
-    ret = [0,0,0,0,0,0]
-    ret[index] = 1
-    return np.array(ret)
 
-emptyCell = np.zeros(6)
-rook = piece(0)
-knight = piece(1)
-bishop = piece(2)
-queen = piece(3)
-king = piece(4)
-pawn = piece(5)
+emptyCell = np.int32(0)
+
+rook = np.int32(1)
+rook_moved = np.int32(2)
+
+knight = np.int32(3)
+bishop = np.int32(4)
+queen = np.int32(5)
+
+king = np.int32(6)
+king_moved = np.int32(7)
+
+pawn = np.int32(8)
+
 
 piecesRank = np.array([rook, knight, bishop, queen, king, bishop, knight, rook ])
 pawnsRank = np.array([pawn, pawn, pawn, pawn, pawn, pawn, pawn, pawn])

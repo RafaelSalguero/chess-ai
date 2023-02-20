@@ -1,17 +1,27 @@
 import numpy as np
 from colorama import Fore, Back
-from board import rook, knight, bishop, queen, king, pawn, emptyCell
+from board import rook, knight, bishop, queen, king, pawn, emptyCell, rook_moved, king_moved
 from moves import col_names
 
-black_chars = ['♜', '♞', '♝', '♛', '♚', '♟︎', ' ']
-white_chars = ['♖', '♘', '♗', '♕', '♔', '♙', ' ']
-all_pieces = np.array([rook, knight, bishop, queen, king, pawn, emptyCell])
+black_chars = ['♜', '♜', '♞', '♝', '♛', '♚', '♚', '♟︎', ' ']
+white_chars = ['♖', '♖', '♘', '♗', '♕', '♔', '♔', '♙', ' ']
+ascii_chars = 'rnbqkp '
+
+def board_to_ascii(s):
+    for i, x in enumerate(black_chars):
+        s = s.replace(x, ascii_chars[i].upper())
+
+    for i, x in enumerate(white_chars):
+        s = s.replace(x, ascii_chars[i])
+    return s
+
+all_pieces = np.array([rook, rook_moved, knight, bishop, queen, king, king_moved, pawn, emptyCell])
 
 def print_piece(piece, on_white):
-    black = np.sum(piece) < 0
+    black = piece < 0
     piece = np.abs(piece)
 
-    pieceIndex = np.where(np.all(all_pieces ==  piece, axis=1))[0][0]
+    pieceIndex = np.where(all_pieces == piece)[0][0]
 
     char =  (black_chars if black else white_chars)[pieceIndex]
     print(' ' + char + ' ', end='')
@@ -22,11 +32,11 @@ def parse_piece(piece):
     if(pchar == ''):
         return emptyCell
     
-    if(pchar in black_chars):
-        return -all_pieces[black_chars.index(pchar)]
+    color = 1 if pchar.lower() == pchar else -1
     
-    if(pchar in white_chars):
-        return all_pieces[white_chars.index(pchar)]
+    pchar = pchar.lower()
+    if(pchar in ascii_chars):
+        return all_pieces[ascii_chars.index(pchar)] * color
     
     raise Exception(f"Cant parse piece '{piece}'")
 
@@ -41,6 +51,7 @@ def print_rank(rank, white):
 def parse_rank(rank):
     rank = rank.lstrip(" ")
     ret = []
+
     for col in range(0, 8):
         piece = rank[(col * 3 + 1):(col * 3 + 1 + 3)]
         ret.append(parse_piece(piece))
@@ -61,7 +72,8 @@ def print_board(board):
         print(' ' + col + ' ', end='')
     print()
 
-def parse_board(board):
+def  parse_board(board):
+    board = board_to_ascii(board)
     lines = board.splitlines(False)
     ret = []
     for line in lines:
