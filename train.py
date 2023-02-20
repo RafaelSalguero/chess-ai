@@ -5,6 +5,7 @@ from test import get_test_boards
 from minmax import iterative_deepening, minimax
 from board import getInitialBoard, initialBoard
 import os
+from ttable import init_transposition_table
 
 from utils import get_np_hash, softmax
 from view import print_board
@@ -71,35 +72,39 @@ def get_sim_games(depth, max_iter, size=128, threads = 8, verbose=True):
     if(size % threads != 0):
         raise Exception("Size must be a multiple of threads")
     
+    ttable = init_transposition_table(1024 * 1024 * 1024)
+
     boards = np.empty((size, 8, 8), dtype=np.int32)
     y_evals = np.empty(size)
 
     step = size // threads
-    for i in prange(threads):
-        dest_index = i * step
-        get_sim_games_inplace(depth, max_iter, boards, y_evals, dest_index, f'{i}/{threads} - ', size / threads, verbose)
+    
+    for thread in prange(threads):
+        get_sim_games_inplace(depth, max_iter, boards, y_evals, thread * step, ttable, f'{thread}/{threads} - ', step, verbose)
 
     return (boards, y_evals)
 @njit
-def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, prefix = '', size=128, verbose=True):
+def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, ttable, prefix = '', size=128, verbose=True):
     initial_copy = np.copy(initialBoard)
     board = np.copy(initial_copy)
     
-    added = set()
+    # added = set()
     color = 1
     eval = 0
 
     not_added_counter = 0
 
-    prob_ratio = 1
+    prob_ratio = 2
 
     index = 0
+
     while True:
         train_board = board if color == 1 else flip_board(board)
         train_board_hash = get_np_hash(train_board)
-        if(not train_board_hash in added):
+        #  not train_board_hash in added
+        if(True):
             not_added_counter = 0
-            added.add(train_board_hash)
+            # added.add(train_board_hash)
             dest_boards[index + dest_index] = train_board
             dest_evals[index + dest_index] = eval
             index += 1
@@ -107,8 +112,7 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
             if(index >= size):
                 break
 
-            if(index % 100 == 0):
-                print(f"{prefix}sim_games count: {index}")
+            print(f"{prefix}sim_games count: {index}")
         else:
             not_added_counter += 1
             if(not_added_counter > 100):
@@ -118,10 +122,8 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
 
         if(verbose):
             print_board(board)
-        
 
         moves = get_all_moves(board, color)
-
         if(len(moves)== 0):
             if(verbose):
                 print(f'win: {evalWin(board)}')
@@ -134,7 +136,7 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
 
         for move in moves:
             undo = apply_move_inplace(board, move)
-            next_evals.append(iterative_deepening(depth, max_iter, board, next_color))
+            next_evals.append(iterative_deepening(depth, max_iter, board, next_color, ttable))
             undo_move_inplace(board, move, undo)
 
         if(verbose):
@@ -148,5 +150,6 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
             print(f'{prefix}best: {moves_s[best]} ({next_evals[best]})')
 
         board = apply_move(board, moves[best])
+
         color = next_color
-        eval = next_evals[best]    
+        eval = next_evals[best]

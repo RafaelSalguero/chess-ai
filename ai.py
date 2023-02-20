@@ -27,8 +27,8 @@ def get_train_data(depth, max_iter, size, cache = False):
     return (x, y)
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
-(x_train, y_train) = get_train_data(0, 102, 50000)
-(x_test, y_test) = get_train_data(0, 50000, 1000)
+(x_train, y_train) = get_train_data(2, 50000, 50000)
+(x_test, y_test) = get_train_data(2, 50000, 1000)
 
 # np.savez_compressed("train_data/get_sim_games_2_16384", x_train = x_train, y_train=y_train)
 x_train = onehot_encode_board(x_train)
