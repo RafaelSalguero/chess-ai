@@ -11,7 +11,7 @@ hash_randoms = np.random.default_rng(123456).integers(0, 2147483648 - 1, size=10
 def get_np_hash(arr):
     arr = arr.reshape(-1)
     len = arr.shape[0]
-    return np.int32(np.sum((arr + 10) * hash_randoms[0:len]))
+    return np.abs(np.int32(np.sum((arr + 10) * hash_randoms[0:len])))
 
 
 _onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8)))

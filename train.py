@@ -72,6 +72,7 @@ def get_sim_games(depth, max_iter, size=128, threads = 8, verbose=True):
     if(size % threads != 0):
         raise Exception("Size must be a multiple of threads")
     
+    # For some reason the ttable is not working (looks like evals are wrong too)
     ttable = init_transposition_table(1024 * 1024 * 1024)
 
     boards = np.empty((size, 8, 8), dtype=np.int32)
@@ -85,6 +86,8 @@ def get_sim_games(depth, max_iter, size=128, threads = 8, verbose=True):
     return (boards, y_evals)
 @njit
 def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, ttable, prefix = '', size=128, verbose=True):
+    # Duplicate elimination was tested but it was found that the search space is so big that 
+    # duplicates are rare
     initial_copy = np.copy(initialBoard)
     board = np.copy(initial_copy)
     
@@ -113,6 +116,7 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
         for move in moves:
             undo = apply_move_inplace(board, move)
             next_eval = iterative_deepening(depth, max_iter, board, next_color, ttable)
+
             dest_boards[index + dest_index] = board
             dest_evals[index + dest_index] = next_eval
 
@@ -128,7 +132,7 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
             if(index >= size):
                 return
 
-            if(index % 10 == 0):
+            if(index % 20 == 0):
                 print(f"{prefix}sim_games count: {index}/{size}")
             
             undo_move_inplace(board, move, undo)

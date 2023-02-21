@@ -23,19 +23,22 @@ inf_val = 100000
 def alphabeta(board, color, depth, alpha, beta, eval_func, parent_move, ttable):
     iters = 1
     
-    (ttable_hit, ttable_read) = get_transposition_table(ttable, board, color, depth)
-    if(ttable_hit):
-        return (ttable_read, parent_move, None, iters)
+    if(ttable != None):
+        (ttable_hit, ttable_read) = get_transposition_table(ttable, board, color, depth)
+        if(ttable_hit):
+            return (ttable_read, parent_move, None, iters)
 
     if(depth == 0):
         eval = eval_func(board, color)
-        set_transposition_table(ttable, board, color, depth, eval)
+        if(ttable != None):
+            set_transposition_table(ttable, board, color, depth, eval)
         return (eval, parent_move, None, iters)
     
     moves = get_all_moves(board, color)
     if(len(moves)==0): 
         eval = eval_func(board, color)
-        set_transposition_table(ttable, board, color, depth, eval)
+        if(ttable != None):
+            set_transposition_table(ttable, board, color, depth, eval)
         return (eval, parent_move, None, iters)
     
     value = -inf_val
@@ -64,7 +67,9 @@ def alphabeta(board, color, depth, alpha, beta, eval_func, parent_move, ttable):
 
         alpha = max(alpha, value)
 
-    set_transposition_table(ttable, board, color, depth, value)
+    if(ttable != None):
+        set_transposition_table(ttable, board, color, depth, value)
+        
     return (value, best_variation, best_move, iters)
 
 def minimax(board, color, depth, eval_func, calc_variation = False):
