@@ -6,6 +6,7 @@ from train import get_sim_games
 import os
 
 from utils import onehot_encode_board
+from view import print_board
 # Disable GPU training:
 # tf.config.set_visible_devices([], 'GPU')
 
@@ -20,15 +21,17 @@ def get_train_data(depth, max_iter, size, cache = False):
         with np.load(file_name) as data:
             return (data['x'], data['y'])
         
-    (x, y) = get_sim_games(depth, max_iter, size=size, verbose= False)
+    (x, y) = get_sim_games(depth, max_iter, size=size, threads=8, verbose= False)
 
     if (cache):
         np.savez_compressed(file_name, x=x, y=y)
     return (x, y)
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
-(x_train, y_train) = get_train_data(100, 200, 50000, True)
-(x_test, y_test) = get_train_data(100, 200, 1000)
+(x_train, y_train) = get_train_data(2, 50000, 10000, False)
+
+
+(x_test, y_test) = get_train_data(2, 50000, 1000)
 
 # np.savez_compressed("train_data/get_sim_games_2_16384", x_train = x_train, y_train=y_train)
 x_train = onehot_encode_board(x_train)

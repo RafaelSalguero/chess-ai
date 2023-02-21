@@ -36,7 +36,7 @@ def print_piece(piece, on_white):
     pieceIndex = np.where(all_pieces == piece)[0][0]
 
     char =  (black_chars if black else white_chars)[pieceIndex]
-    print(' ' + char + ' ', '')
+    return ' ' + char + ' '
 
 def parse_piece(piece):
     pchar = piece.strip(" ")
@@ -55,11 +55,13 @@ def parse_piece(piece):
 @njit
 def print_rank(rank, white):
     color = white
+    ret = ''
     for piece in rank:
-        print(BACK_WHITE if color else BACK_GREEN, '')
-        print_piece(piece, color)
+        ret += (BACK_WHITE if color else BACK_GREEN)
+        ret += print_piece(piece, color)
         color = not color
-    print(BACK_RESET)
+    ret += (BACK_RESET)
+    return ret
 
 def parse_rank(rank):
     rank = rank.lstrip(" ")
@@ -76,15 +78,11 @@ def print_board(board):
     color = True
     rn = 8
     for rank in board:
-        print(rn, '')
         rn = rn - 1
-        print_rank(rank, color)
+        print(f'{rn}{print_rank(rank, color)}')
         color = not color
     
-    print(' ', '')
-    for col in col_names:
-        print(' ' + col + ' ', '')
-    print()
+    print('  a  b  c  d  e  f  g  h')
 
 def  parse_board(board):
     board = board_to_ascii(board)

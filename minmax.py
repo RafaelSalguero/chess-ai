@@ -18,7 +18,6 @@ def variation_str(variation):
 
 
 
-
 inf_val = 100000
 @njit
 def alphabeta(board, color, depth, alpha, beta, eval_func, parent_move, ttable):
