@@ -79,7 +79,7 @@ def print_board(board):
     rn = 8
     for rank in board:
         rn = rn - 1
-        print(f'{rn}{print_rank(rank, color)}')
+        print(f'{rn + 1}{print_rank(rank, color)}')
         color = not color
     
     print('  a  b  c  d  e  f  g  h')

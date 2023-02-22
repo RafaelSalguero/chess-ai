@@ -2,12 +2,12 @@ import numpy as np
 from eval import evalBoard, evalWin
 from moves import apply_move, apply_move_inplace, flip_board, get_all_moves, move_str_an, moves_str_an, undo_move_inplace
 from test import get_test_boards
-from minmax import iterative_deepening, minimax
+from minmax import iterative_deepening, minimax, variation_str, variation_str_an
 from board import getInitialBoard, initialBoard
 import os
 from ttable import init_transposition_table
 
-from utils import get_np_hash, softmax
+from utils import get_np_hash, shuffle, softmax
 from view import print_board
 from numba import njit, prange
 
@@ -77,15 +77,17 @@ def get_sim_games(depth, max_iter, size=128, threads = 8, verbose=True):
 
     boards = np.empty((size, 8, 8), dtype=np.int32)
     y_evals = np.empty(size)
+    ply = np.empty(size, dtype=np.int32)
 
     step = size // threads
     
     for thread in prange(threads):
-        get_sim_games_inplace(depth, max_iter, boards, y_evals, thread * step, ttable, f'{thread}/{threads} - ', step, verbose)
+        get_sim_games_inplace(depth, max_iter, boards, y_evals, ply, thread * step, ttable, f'{thread}/{threads} - ', step, verbose and thread == 0)
 
-    return (boards, y_evals)
+    return (boards, y_evals, ply)
+
 @njit
-def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, ttable, prefix = '', size=128, verbose=True):
+def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_ply, dest_index, ttable, prefix = '', size=128, verbose=True):
     # Duplicate elimination was tested but it was found that the search space is so big that 
     # duplicates are rare
     initial_copy = np.copy(initialBoard)
@@ -96,9 +98,12 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
     prob_ratio = 2
 
     index = 0
+    ply = 0
 
     dest_boards[index + dest_index] = initial_copy
     dest_evals[index + dest_index] = 0
+    dest_ply[index + dest_index] = ply
+
     index += 1
 
     while True:
@@ -108,31 +113,38 @@ def get_sim_games_inplace(depth, max_iter, dest_boards, dest_evals, dest_index, 
                 print(f'win: {evalWin(board)}')
             color = 1
             board = initial_copy
+            ply = 0
             continue
         
         next_evals = []
         next_color = -color
+        ply += 1
 
+        shuffle(moves)
         for move in moves:
             undo = apply_move_inplace(board, move)
-            next_eval = iterative_deepening(depth, max_iter, board, next_color, ttable)
 
-            dest_boards[index + dest_index] = board
-            dest_evals[index + dest_index] = next_eval
+            dest_ply[index + dest_index] = ply
 
-            next_evals.append(next_eval)
-
-            dest_boards[index + dest_index] = dest_boards[index + dest_index] if next_color == 1 else flip_board(dest_boards[index + dest_index])
+            board_white_player = board if next_color == 1 else flip_board(board)
+            dest_boards[index + dest_index] = board_white_player
 
             if(verbose):
                 print_board(dest_boards[index + dest_index])
-                print(f"eval: {int(dest_evals[index + dest_index])}")
+                
+            (next_eval, variation, iters, best_depth) = iterative_deepening(depth, max_iter, board_white_player, 1, ttable, verbose)
+            next_evals.append(next_eval)
+            dest_evals[index + dest_index] = next_eval
+
+            if(verbose):
+                (variation_text, _, _) = variation_str_an(variation, board_white_player, 1)
+                print(f"ply: {ply} eval: {int(dest_evals[index + dest_index])} ({variation_text}), iters: {iters}, depth: {best_depth}")
 
             index += 1
             if(index >= size):
                 return
 
-            if(index % 20 == 0):
+            if(index % 100 == 0):
                 print(f"{prefix}sim_games count: {index}/{size}")
             
             undo_move_inplace(board, move, undo)

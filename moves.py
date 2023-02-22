@@ -335,6 +335,7 @@ def get_knight_moves(board, pos, color):
 
     return ret
 
+# Get a list of all possible moves, this is a pure function since moves are indexable
 @njit
 def get_all_moves(board, color):
     ret = [(np.array([0,0]), np.array([0,0])) for x in range(0)]

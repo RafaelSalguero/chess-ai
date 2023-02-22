@@ -17,3 +17,11 @@ def get_np_hash(arr):
 _onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8)))
 def onehot_encode_board(x):
     return _onehot_diags[x]
+
+@njit
+def shuffle(items):
+    i = len(items)
+    while i > 1:
+        i = i - 1
+        j = np.random.randint(i)  # 0 <= j <= i-1
+        items[j], items[i] = items[i], items[j]
