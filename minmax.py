@@ -1,10 +1,11 @@
 from moves import apply_move, get_all_moves, is_empty_cell, move_str, apply_move_inplace, move_str_an, undo_move_inplace
-from eval import evalBoard
+from eval import evalBoard, win_value
 from numba import njit, deferred_type, int32, optional, typeof
 from numba.experimental import jitclass
 from ttable import get_transposition_table, init_transposition_table, set_transposition_table
-from utils import get_np_hash
+from utils import get_np_hash, shuffle
 from collections import OrderedDict
+
 import numpy as np
 
 node_type = deferred_type()
@@ -44,29 +45,24 @@ def variation_str_an(variation, board, color):
     return (parent_str + '->' + curr_str, board, color)
 
 
-quiescence_depth = 5
-inf_val = 100000
+inf_val = 300
+
 @njit
-def alphabeta(board, color, quiescence, depth, max_iter, alpha, beta, eval_func, parent_move, ttable, ttable_write):
+def alphabeta(board, color, quiescence, depth, quiescence_depth, max_iter, alpha, beta, eval_func, parent_move, ttable, ttable_write):
     iters = 1
     
-    if(ttable != None):
+    if(ttable is not None):
         (ttable_hit, ttable_read) = get_transposition_table(ttable, board, color, depth)
         if(ttable_hit):
             return (ttable_read, parent_move, None, iters)
 
     if(depth == 0):
         eval = eval_func(board, color)
-        if(ttable != None and ttable_write):
+        if(ttable is not None and ttable_write):
             set_transposition_table(ttable, board, color, depth, eval)
         return (eval, parent_move, None, iters)
     
     moves = get_all_moves(board, color)
-    if(len(moves)==0): 
-        eval = eval_func(board, color)
-        if(ttable != None and ttable_write):
-            set_transposition_table(ttable, board, color, depth, eval)
-        return (eval, parent_move, None, iters)
     
     value = -inf_val
 
@@ -74,10 +70,13 @@ def alphabeta(board, color, quiescence, depth, max_iter, alpha, beta, eval_func,
     best_move = None
 
     #random.shuffle(moves)
+    shuffle(moves)
+    move_count = 0
     for move in moves:
         is_take = not is_empty_cell(board, move[1])
         if(quiescence and not is_take):
             continue
+        move_count += 1
 
         undo = apply_move_inplace(board, move)
 
@@ -85,18 +84,20 @@ def alphabeta(board, color, quiescence, depth, max_iter, alpha, beta, eval_func,
 
         next_depth = depth - 1
         next_quiescence = quiescence
-        if(is_take and depth == 1 and not quiescence):
+        if(is_take and depth == 1 and not quiescence and quiescence_depth > 0):
             # enable quiescence search:
             next_quiescence = True
             next_depth = quiescence_depth
         
-        (move_eval, next_variation, _, child_iters) = alphabeta(board, -color, next_quiescence, next_depth, max_iter - iters, -beta, -alpha, eval_func, curr_variation, ttable, ttable_write and not quiescence)
+        next_max_iter = max_iter - iters
+        (move_eval, next_variation, _, child_iters) = alphabeta(board, -color, next_quiescence, next_depth, quiescence_depth, next_max_iter, -beta, -alpha, eval_func, curr_variation, ttable, ttable_write and not quiescence)
         iters += child_iters
 
         undo_move_inplace(board, move, undo)
 
-        if(iters > max_iter):
-            break
+        if(iters > max_iter or child_iters == -1):
+            # early break:
+            return (value, best_variation, best_move, -1)
 
         move_eval = -move_eval
 
@@ -111,7 +112,18 @@ def alphabeta(board, color, quiescence, depth, max_iter, alpha, beta, eval_func,
 
         alpha = max(alpha, value)
 
-    if(ttable != None and ttable_write):
+    if(move_count==0): 
+        eval = eval_func(board, color)
+        if(ttable is not None and ttable_write):
+            set_transposition_table(ttable, board, color, depth, eval)
+        return (eval, parent_move, None, iters)
+    
+    if(quiescence and value < -win_value):
+        # If the game was lost on quiescence search, restart with normal search:
+        print("quiescence check {value}")
+        return alphabeta(board, color, False, 1, quiescence_depth, max_iter - iters, alpha, beta, eval_func, parent_move, ttable, ttable_write)
+
+    if(ttable is not None and ttable_write):
         set_transposition_table(ttable, board, color, depth, value)
         
     return (value, best_variation, best_move, iters)
@@ -120,7 +132,7 @@ def minimax(board, color, depth, eval_func, calc_variation = False):
     return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, Variation(None, None) if calc_variation else None)
 
 @njit
-def iterative_deepening(max_depth, max_iter, board, color, ttable, calc_variation):
+def iterative_deepening(max_depth, quiescence_depth, max_iter, board, color, ttable, calc_variation):
     value = 0
     rem_iters = max_iter
 
@@ -128,8 +140,8 @@ def iterative_deepening(max_depth, max_iter, board, color, ttable, calc_variatio
     best_variation = root_variation
     best_depth = 0
     for depth in range(0, max_depth + 1):
-        (next_value, next_best_variation, _, iters) = alphabeta(board, color, False, depth, rem_iters, -inf_val, inf_val, evalBoard, root_variation if calc_variation else None, ttable, True)
-        if(depth > 0 and iters > rem_iters):
+        (next_value, next_best_variation, _, iters) = alphabeta(board, color, False, depth, quiescence_depth, rem_iters, -inf_val, inf_val, evalBoard, root_variation if calc_variation else None, ttable, True)
+        if(depth > 0 and iters  == -1):
             # early break, this result is not valid, we take the previous one
             break
 

@@ -1,22 +1,32 @@
 import tensorflow as tf
+import numpy as np
 
-from ai_old import ai_player
-from ai_arch import arch_a1_c0, arch_a1_c1, arch_a1_c2, arch_a1_d0, arch_a1_d1
-from game import simulateGames
-from board import testInitialBoard
-old_model = tf.keras.models.load_model("models/evalBoard_0")
-curr_model = tf.keras.models.load_model("models/amplify_0_arch_a1_c2_rate_96")
+def y_func(x):
+    real_val = 0.7 if x == 0 else 0.2 if x == 1 else 0.5
+    return real_val
+    return 1 if np.random.random() < real_val else 0
 
-for arch in [arch_a1_d0, arch_a1_d1, arch_a1_c0, arch_a1_c1, arch_a1_c2]:
-    print(arch.__name__, arch().summary())
+x_train = np.random.random_integers(0, 2, 1000)
+y_train = np.array(list(map(y_func, x_train)))
 
-exit()
+x_test = np.array([0, 1, 2])
+y_test = np.array([0.7, 0.2, 0.5])
 
+print(x_test)
+print(y_test)
 
-print(old_model.summary())
-print(curr_model.summary())
+model = tf.keras.Sequential([
+    tf.keras.Input(shape=(1)),
+    tf.keras.layers.Dense(3, activation="swish"),
+    tf.keras.layers.Dense(3, activation="swish"),
+    tf.keras.layers.Dense(1, activation="sigmoid")
+])
 
-old_player = ai_player(old_model)
-curr_player = ai_player(curr_model)
+print(model.summary())
 
-simulateGames(testInitialBoard, curr_player, old_player, 100, True)
+model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+
+model.fit(x_train, y_train, validation_data = (x_test, y_test), epochs=100, batch_size=32)
+
+print("actual output:")
+print(model(np.array([[0], [1], [2]])))

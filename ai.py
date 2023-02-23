@@ -14,13 +14,13 @@ from view import print_board
 # Piece types: 0 Pawn, 1 Knight,  2 Bishop, 3 Rook, 4 Queen, 5 King
 
 
-def get_train_data(depth, max_iter, size, cache = False):
+def get_train_data(depth, quiescence_depth, max_iter, size, cache = False):
     file_name = f'train_data/get_sim_games_{depth}_{max_iter}_{size}.npz'
     if(cache and os.path.isfile(file_name)):
         with np.load(file_name) as data:
             return (data['x'], data['y'], data['ply'])
         
-    (x, y, ply) = get_sim_games(depth, max_iter, size=size, threads=8, verbose= True)
+    (x, y, ply) = get_sim_games(depth, quiescence_depth, max_iter, size=size, threads=8, verbose=False)
 
     if (cache):
         np.savez_compressed(file_name, x=x, y=y, ply=ply)
@@ -28,17 +28,17 @@ def get_train_data(depth, max_iter, size, cache = False):
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
 print("generating train data")
-(x_train, y_train, ply_train) = get_train_data(100, 5000, 50000, True)
+(x_train, y_train, ply_train) = get_train_data(0, 0, 3000, 50000, True)
 
 print("generating test data")
 
-(x_test, y_test, ply_test) = get_train_data(100, 5000, 10000, True)
+(x_test, y_test, ply_test) = get_train_data(0, 0, 3000, 10000, True)
 
 print("train sample:")
 
-for i in np.random.random_integers(0, x_train.shape[0], 20):
+for i in np.random.random_integers(0, x_test.shape[0], 20):
     print_board(x_train[i])
-    print(f"eval: {y_train[i]}")
+    print(f"ply: {ply_train[i]}, eval: {y_train[i]}")
 
 
 print("test sample:")
@@ -50,27 +50,17 @@ for i in np.random.random_integers(0, x_test.shape[0], 20):
 
 model = tf.keras.Sequential([
     tf.keras.Input(shape=(8,8,1)),
-    tf.keras.layers.Conv2D(8, 7, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(6, 5, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(4, 5, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
+    tf.keras.layers.Conv2D(8, 1, padding="same", activation="swish"),
+    tf.keras.layers.Conv2D(8, 1, padding="same", activation="swish"),
+    tf.keras.layers.Conv2D(4, 1, padding="same", activation="swish"),
+    tf.keras.layers.Conv2D(2, 1, padding="same", activation="swish"),
+    tf.keras.layers.Conv2D(1, 1, padding="same", activation="swish"),
 
-    tf.keras.layers.MaxPool2D(pool_size=(2,2)),
-
-    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
-    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
-
-    tf.keras.layers.MaxPool2D(pool_size=(2,2)),
-
+    tf.keras.layers.AveragePooling2D(pool_size=(8,8)),
     tf.keras.layers.Flatten(),
-    
 
     tf.keras.layers.Dense(1)
 ])
-
-print(model.summary())
 
 loss_fn = tf.keras.losses.MeanSquaredError()
 model.compile(optimizer='adam', loss=loss_fn, metrics=[tf.keras.metrics.RootMeanSquaredError()])

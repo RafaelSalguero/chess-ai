@@ -8,10 +8,13 @@ pieceValues = np.array([
     3, # knight
     3, # bishop
     9, # queen
-    150, # king
-    150, # king_moved
+    300, # king
+    300, # king_moved
     1 # pawn
 ], dtype=np.float32)
+
+# Any value above this represents a win
+win_value = 300 - (9 * 9 + (5 + 3 + 3) * 2) + 1
 
 @njit
 def evalCell(cell):
