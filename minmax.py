@@ -118,6 +118,7 @@ def alphabeta(board, color, quiescence, depth, quiescence_depth, max_iter, alpha
             set_transposition_table(ttable, board, color, depth, eval)
         return (eval, parent_move, None, iters)
     
+    # TODO Check for win/loss instead of win_value
     if(quiescence and value < -win_value):
         # If the game was lost on quiescence search, restart with normal search:
         print("quiescence check {value}")

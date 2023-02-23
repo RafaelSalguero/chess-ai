@@ -8,8 +8,8 @@ pieceValues = np.array([
     3, # knight
     3, # bishop
     9, # queen
-    300, # king
-    300, # king_moved
+    50, # king
+    50, # king_moved
     1 # pawn
 ], dtype=np.float32)
 
