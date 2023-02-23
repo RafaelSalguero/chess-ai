@@ -37,12 +37,14 @@ print("generating test data")
 
 print(f"train sample {x_train.shape[0]} {y_train.shape[0]}:")
 
+any_diff = False
 for i in np.random.random_integers(0, x_train.shape[0] - 1, 10000):
     if(evalBoard(x_train[i], 1) != y_train[i]):
         print(f"EVAL DIFF y_train: {y_train[i]} evalBoard: {evalBoard(x_train[i], 1)}")
-        exit()
+        any_diff = True
     # print(f"ply: {ply_train[i]}, eval: {y_train[i]} evalBoard: {evalBoard(x_train[i], 1)}")
-
+if(any_diff):
+    exit()
 
 print("test sample:")
 

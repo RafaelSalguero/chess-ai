@@ -6,16 +6,15 @@ from numba import njit, vectorize, float32, int32
 def softmax(x):
     return(np.exp(x - np.max(x)) / np.exp(x - np.max(x)).sum())
 
-hash_randoms = np.random.default_rng(123456).integers(0, 2147483647, size=1024).astype(dtype=np.int32)
+hash_randoms = np.random.default_rng(123456).integers(0, 9223372036854775807, size=1024).astype(dtype=np.int64)
 @njit
 def get_np_hash(arr):
     arr = (arr).reshape(-1)
     len = arr.shape[0]
-    return np.abs(np.int32(np.sum(arr * hash_randoms[0:len])))
+    return np.abs(np.int64(np.sum((arr + 100) * hash_randoms[0:len])))
 
 
 _onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8)))
-@njit
 def onehot_encode_board(x):
     return _onehot_diags[x + 8]
 

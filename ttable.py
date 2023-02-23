@@ -11,24 +11,27 @@ value_bias = 1000
 @njit
 def set_transposition_table(table, board, color, depth, eval):
     board_hash = get_np_hash(board if color == 1 else flip_board(board))
-    entry_index = np.int32(board_hash % table.shape[0])
+    board_hash_big = np.int32(board_hash // 2147483648)
+    entry_index = board_hash % table.shape[0]
     
-    table_depth = (table[entry_index] // depth_mul) - depth_bias
+    table_depth = (table[entry_index, 1] // depth_mul) - depth_bias
     if(depth >= table_depth):
-        table[entry_index] = (depth + depth_bias) * depth_mul + (eval * color + value_bias)
+        table[entry_index, 0] = board_hash_big
+        table[entry_index, 1] = (depth + depth_bias) * depth_mul + (eval + value_bias)
 
 @njit
 def get_transposition_table(table, board, color, depth):
     board_hash = get_np_hash(board if color == 1 else flip_board(board))
+    board_hash_big = np.int32(board_hash // 2147483648)
     entry_index = board_hash % table.shape[0]
 
-    table_depth = (table[entry_index] //depth_mul) - depth_bias
-    if(table[entry_index] != 0 and table_depth >= depth):
-        value = ((table[entry_index] % depth_mul) - value_bias) * color
+    table_depth = (table[entry_index, 1] //depth_mul) - depth_bias
+    if(table[entry_index, 0] == board_hash_big and table_depth == depth):
+        value = ((table[entry_index, 1] % depth_mul) - value_bias)
         return (True, value) 
     
     return (False, 0)
 
 @njit
 def init_transposition_table(size):
-    return np.zeros(size, dtype=np.int32)
+    return np.zeros((size, 2), dtype=np.int32)
