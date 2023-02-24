@@ -57,7 +57,7 @@ x_train = onehot_encode_board(x_train)
 
 model = tf.keras.Sequential([
     tf.keras.Input(shape=(8,8,8)),
-    tf.keras.layers.Conv2D(8, 1, activation="swish"),
+    tf.keras.layers.Conv2D(4, 3, padding="same", activation="swish"),
     tf.keras.layers.Conv2D(8, 1, activation="swish"),
     tf.keras.layers.Conv2D(8, 1, activation="swish"),
     
@@ -68,6 +68,8 @@ model = tf.keras.Sequential([
 
     tf.keras.layers.Dense(1)
 ])
+
+
 
 print(model.summary())
 

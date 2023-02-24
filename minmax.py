@@ -1,5 +1,5 @@
 from moves import apply_move, get_all_moves, is_empty_cell, move_str, apply_move_inplace, move_str_an, undo_move_inplace
-from eval import evalBoard, win_value
+from eval import evalBoard, win_value_heuristic
 from numba import njit, deferred_type, int32, optional, typeof
 from numba.experimental import jitclass
 from ttable import get_transposition_table, init_transposition_table, set_transposition_table
@@ -119,7 +119,7 @@ def alphabeta(board, color, quiescence, depth, quiescence_depth, max_iter, alpha
         return (eval, parent_move, None, iters)
     
     # TODO Check for win/loss instead of win_value
-    if(quiescence and value < -win_value):
+    if(quiescence and value < -win_value_heuristic):
         # If the game was lost on quiescence search, restart with normal search:
         print("quiescence check {value}")
         return alphabeta(board, color, False, 1, quiescence_depth, max_iter - iters, alpha, beta, eval_func, parent_move, ttable, ttable_write)

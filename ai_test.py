@@ -1,32 +1,27 @@
 import tensorflow as tf
 import numpy as np
+from layers import conv2d
 
-def y_func(x):
-    real_val = 0.7 if x == 0 else 0.2 if x == 1 else 0.5
-    return real_val
-    return 1 if np.random.random() < real_val else 0
+x = np.random.random(5 * 5 * 3).reshape((5,5,3))
 
-x_train = np.random.random_integers(0, 2, 1000)
-y_train = np.array(list(map(y_func, x_train)))
-
-x_test = np.array([0, 1, 2])
-y_test = np.array([0.7, 0.2, 0.5])
-
-print(x_test)
-print(y_test)
 
 model = tf.keras.Sequential([
-    tf.keras.Input(shape=(1)),
-    tf.keras.layers.Dense(3, activation="swish"),
-    tf.keras.layers.Dense(3, activation="swish"),
-    tf.keras.layers.Dense(1, activation="sigmoid")
+    tf.keras.Input(shape=(5,5,3)),
+    tf.keras.layers.Conv2D(2, 3, padding="same")
 ])
+model.compile()
 
-print(model.summary())
+y_model = model(np.array([x]))
 
-model.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+w = model.layers[0].weights
+kernel = w[0].numpy()
+bias = w[1].numpy()
 
-model.fit(x_train, y_train, validation_data = (x_test, y_test), epochs=100, batch_size=32)
+print("kernel: ", kernel)
+print("bias: ", bias)
 
-print("actual output:")
-print(model(np.array([[0], [1], [2]])))
+y_np = conv2d(x, np.zeros((5,5,2)), kernel, bias)
+
+print("y_model", y_model)
+print("y_np", y_np)
+print("diff", np.sum(np.abs(y_np - y_model)))
