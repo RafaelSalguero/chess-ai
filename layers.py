@@ -7,6 +7,10 @@ from numba.experimental import jitclass
 type_input = -1
 type_conv2d = 0
 type_swish2d = 1
+type_swish1d = 2
+type_sigmoid1d = 3
+type_flatten = 4
+type_dense = 5
 
 spec = OrderedDict()
 spec['type'] = typeof(0)
@@ -24,10 +28,20 @@ class KerasNumbaLayer:
         self.data3d = data3d
         self.data4d = data4d
 
-def _get_activation_layer(activation, output_shape):
+def _get_activation_layer(dims, activation, output_shape):
         output_array = np.empty(output_shape, np.float32)
         if(activation == 'swish'):
-            return KerasNumbaLayer(type_swish2d, None, None, List([output_array]), None)
+            if(dims == 2):
+                return KerasNumbaLayer(type_swish2d, None, None, List([output_array]), None)
+            elif(dims == 1):
+                return KerasNumbaLayer(type_swish1d, List([output_array]), None, None, None)
+            else:
+                raise Exception(F"Unsupported dims")
+        elif(activation == 'sigmoid'):
+            if(dims == 1):
+                return KerasNumbaLayer(type_sigmoid1d, List([output_array]), None, None, None)
+            else:
+                raise Exception(F"Unsupported dims")
         elif(activation =="linear"):
             return None
         else:
@@ -70,7 +84,19 @@ def get_single_layer_data(layer):
         
         ret.append(KerasNumbaLayer(type_conv2d, List([bias]), None, List([output_array]), List([kernel])))
 
-        a_layer = _get_activation_layer(activation, output_shape)
+        a_layer = _get_activation_layer(2, activation, output_shape)
+        if(a_layer is not None):
+            ret.append(a_layer)
+    elif(layer.name.startswith("flatten")):
+        ret.append(KerasNumbaLayer(type_flatten, List([output_array]), None, None, None))
+    elif(layer.name.startswith("dense")):
+        activation = layer.activation.__name__
+        kernel = layer.kernel.numpy()
+        bias = layer.bias.numpy()
+
+        ret.append(KerasNumbaLayer(type_dense, List([output_array, bias]), List([kernel]), None, None))
+
+        a_layer = _get_activation_layer(1, activation, output_shape)
         if(a_layer is not None):
             ret.append(a_layer)
     else:
@@ -78,17 +104,32 @@ def get_single_layer_data(layer):
     
     return ret
 
+@generated_jit(nopython=True)
+def set_data(layer: KerasNumbaLayer, data):
+    if data.ndim == 1:
+        def x(layer: KerasNumbaLayer, data):
+            layer.data1d = List([data])
+        return x
+    elif data.ndim == 3:
+        def x(layer: KerasNumbaLayer, data):
+            layer.data3d = List([data])
+        return x
+    else:
+        raise Exception("Unsupported data type")
+
 
 @njit
 def calc_layers(input, layers_data: list[KerasNumbaLayer]):
-    layers_data[0].data3d = List([input])
+    first_layer = layers_data[0]
+    set_data(first_layer, input)
+
     for i in range(1, len(layers_data)):
         prev = layers_data[i - 1]
         curr = layers_data[i]
 
         calc_layer(prev, curr)
 
-    return layers_data[-1].data3d[0]
+    return layers_data[-1]
 
 @njit
 def calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
@@ -101,15 +142,49 @@ def calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
         output = layer.data3d[0]
         
         conv2d(input, output, kernel, bias)
+    elif(layer_type == type_dense):
+        input = prev_layer.data1d[0]
+
+        kernel = layer.data2d[0]
+        bias = layer.data1d[1]
+        output = layer.data1d[0]
+        
+        dense(input, output, kernel, bias)
     elif(layer_type == type_swish2d):
         input = prev_layer.data3d[0]
         output = layer.data3d[0]
-        swish2D(input, output)
-
-    return output
+        swish2d(input, output)
+    elif(layer_type == type_swish1d):
+        input = prev_layer.data1d[0]
+        output = layer.data1d[0]
+        swish1d(input, output)
+    elif(layer_type == type_sigmoid1d):
+        input = prev_layer.data1d[0]
+        output = layer.data1d[0]
+        sigmoid1d(input, output)
+    elif(layer_type == type_flatten):
+        input = prev_layer.data3d[0]
+        output = layer.data1d[0]
+        flatten(input, output)
+    else:
+        raise Exception(f"Unsupported")
 
 @njit
-def swish2D(input, output):
+def flatten(input, output):
+    w = input.shape[0]
+    h = input.shape[1]
+    channels = input.shape[2]
+
+    i = 0
+    for x in range(0, w):
+        for y in range(0, h):
+            for c in range(0, channels):
+                output[i] = input[x, y, c]
+                i += 1
+    
+    return output
+@njit
+def swish2d(input, output):
     w = input.shape[0]
     h = input.shape[1]
     channels = input.shape[2]
@@ -118,6 +193,22 @@ def swish2D(input, output):
             for c in range(0, channels):
                 input_val = input[x, y, c]
                 output[x, y, c] = input_val/(1 + np.exp(-input_val))    
+    
+    return output
+
+@njit
+def swish1d(input, output):
+    for i in range(0, len(input)):
+        input_val = input[i]
+        output[i] = input_val/(1 + np.exp(-input_val))    
+    
+    return output
+
+@njit
+def sigmoid1d(input, output):
+    for i in range(0, len(input)):
+        input_val = input[i]
+        output[i] = 1/(1 + np.exp(-input_val))    
     
     return output
 
@@ -145,3 +236,10 @@ def conv2d(input, output, kernel, bias):
                             output[ox, oy, oc] += input_value * weight
 
     return output
+
+@njit
+def dense(input, output, kernel, bias):
+    for i in range(len(output)):
+        output[i] = bias[i]
+        for j in range(len(input)):
+            output[i] += input[j] * kernel[j, i]
