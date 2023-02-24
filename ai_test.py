@@ -1,26 +1,21 @@
 import tensorflow as tf
 import numpy as np
-from layers import conv2d
+from layers import calc_layers, conv2d, get_layer_data
 
-x = np.random.random(5 * 5 * 3).reshape((5,5,3))
+x = np.random.random(5 * 5 * 3).reshape((5,5,3)).astype(np.float32)
 
 
 model = tf.keras.Sequential([
     tf.keras.Input(shape=(5,5,3)),
-    tf.keras.layers.Conv2D(2, 3, padding="same")
+    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear"),
+    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear"),
 ])
 model.compile()
 
 y_model = model(np.array([x]))
 
-w = model.layers[0].weights
-kernel = w[0].numpy()
-bias = w[1].numpy()
-
-print("kernel: ", kernel)
-print("bias: ", bias)
-
-y_np = conv2d(x, np.zeros((5,5,2)), kernel, bias)
+layer_data = get_layer_data(model.layers)
+y_np = calc_layers(x, layer_data)
 
 print("y_model", y_model)
 print("y_np", y_np)
