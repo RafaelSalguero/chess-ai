@@ -7,8 +7,8 @@ x = np.random.random(5 * 5 * 3).reshape((5,5,3)).astype(np.float32)
 
 model = tf.keras.Sequential([
     tf.keras.Input(shape=(5,5,3)),
-    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear"),
-    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear"),
+    tf.keras.layers.Conv2D(2, 3, padding="same", activation="swish", bias_initializer='random_normal'),
+    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear", bias_initializer='random_normal'),
 ])
 model.compile()
 

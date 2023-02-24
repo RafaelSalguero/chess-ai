@@ -10,10 +10,10 @@ type_swish2d = 1
 
 spec = OrderedDict()
 spec['type'] = typeof(0)
-spec['data1d'] = optional(typeof([np.array([0], np.float32)]))
-spec['data2d'] = optional(typeof([np.array([[0]], np.float32)]))
-spec['data3d'] = optional(typeof([np.array([[[0]]], np.float32)]))
-spec['data4d'] = optional(typeof([np.array([[[[0]]]], np.float32)]))
+spec['data1d'] = optional(typeof(List([np.array([0], np.float32)])))
+spec['data2d'] = optional(typeof(List([np.array([[0]], np.float32)])))
+spec['data3d'] = optional(typeof(List([np.array([[[0]]], np.float32)])))
+spec['data4d'] = optional(typeof(List([np.array([[[[0]]]], np.float32)])))
 
 @jitclass(spec)
 class KerasNumbaLayer:
@@ -24,9 +24,10 @@ class KerasNumbaLayer:
         self.data3d = data3d
         self.data4d = data4d
 
-def _get_activation_layer(activation):
+def _get_activation_layer(activation, output_shape):
+        output_array = np.empty(output_shape, np.float32)
         if(activation == 'swish'):
-            return KerasNumbaLayer(type_swish2d, None, None, None, None)
+            return KerasNumbaLayer(type_swish2d, None, None, List([output_array]), None)
         elif(activation =="linear"):
             return None
         else:
@@ -43,7 +44,7 @@ def shape_equals(a, b):
     return True
 
 def get_layer_data(layers):
-    ret = [KerasNumbaLayer(type_input, None, None, None, None)]
+    ret = List([KerasNumbaLayer(type_input, None, None, None, None)])
     for layer in layers:
         ret += get_single_layer_data(layer)
     return ret
@@ -67,9 +68,9 @@ def get_single_layer_data(layer):
         if(strides[0] != 1 or strides[1] != 1):
             raise Exception(f"Strides not supported")
         
-        ret.append(KerasNumbaLayer(type_conv2d, [bias], None, [output_array], [kernel]))
+        ret.append(KerasNumbaLayer(type_conv2d, List([bias]), None, List([output_array]), List([kernel])))
 
-        a_layer = _get_activation_layer(activation)
+        a_layer = _get_activation_layer(activation, output_shape)
         if(a_layer is not None):
             ret.append(a_layer)
     else:
@@ -80,7 +81,7 @@ def get_single_layer_data(layer):
 
 @njit
 def calc_layers(input, layers_data: list[KerasNumbaLayer]):
-    layers_data[0].data3d = [input]
+    layers_data[0].data3d = List([input])
     for i in range(1, len(layers_data)):
         prev = layers_data[i - 1]
         curr = layers_data[i]
