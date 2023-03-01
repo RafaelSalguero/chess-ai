@@ -26,7 +26,7 @@ def get_transposition_table(table, board, color, depth):
     entry_index = board_hash % table.shape[0]
 
     table_depth = (table[entry_index, 1] //depth_mul) - depth_bias
-    if(table[entry_index, 0] == board_hash_big and table_depth == depth):
+    if(table[entry_index, 0] == board_hash_big and table_depth >= depth):
         value = ((table[entry_index, 1] % depth_mul) - value_bias)
         return (True, value) 
     

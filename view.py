@@ -1,9 +1,7 @@
 import numpy as np
 from board import rook, knight, bishop, queen, king, pawn, emptyCell, rook_moved, king_moved
-from moves import col_names
 from numba import njit
 
-ascii_chars = 'rnbqkp '
 
 CSI = '\033['
 
@@ -15,6 +13,7 @@ BACK_GREEN = code_to_chars(42)
 BACK_WHITE = code_to_chars(47)
 BACK_RESET = code_to_chars(49)
 
+ascii_chars = 'rrnbqkkp '
 black_chars = '♜♜♞♝♛♚♚♟ ' 
 white_chars = '♖♖♘♗♕♔♔♙ '
 
@@ -26,10 +25,11 @@ def board_to_ascii(s):
         s = s.replace(x, ascii_chars[i])
     return s
 
-all_pieces = np.array([rook, rook_moved, knight, bishop, queen, king, king_moved, pawn, emptyCell])
 
 @njit
 def print_piece(piece, on_white):
+    all_pieces = np.array([rook, rook_moved, knight, bishop, queen, king, king_moved, pawn, emptyCell])
+
     black = piece < 0
     piece = np.abs(piece)
 
@@ -39,6 +39,8 @@ def print_piece(piece, on_white):
     return ' ' + char + ' '
 
 def parse_piece(piece):
+    all_pieces = np.array([rook_moved, rook_moved, knight, bishop, queen, king_moved, king_moved, pawn, emptyCell])
+
     pchar = piece.strip(" ")
 
     if(pchar == ''):

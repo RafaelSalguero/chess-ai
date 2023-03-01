@@ -1,9 +1,10 @@
 import numpy as np
 from board import pawn, emptyCell, king, rook, knight, bishop, queen, rook_moved, king_moved
-from eval import evalWin
+from eval import evalDeadPosition, evalWin
 from numba import njit
 import numpy.typing as npt
 import tensorflow as tf
+from view import print_board
 
 # A move is represented as  [[y_start, x_start], [y_end, x_end]]
 # All moves are calculated for white, the board is flipped when calculating black moves
@@ -60,7 +61,7 @@ def is_piece(cell, piece, color = None, strict = False):
 
 # Converts a move to algebraic notation
 @njit
-def move_str_an(board, all_moves, move):
+def move_str_an(board, move):
     orig = cell(board, move[0])
     color = np.abs(orig)
 
@@ -70,7 +71,7 @@ def move_str_an(board, all_moves, move):
         if(move[1][1] == 4):
             return "O-O"
         
-    name =  "K" if is_piece(orig, king) else "Q" if is_piece(orig, queen) else  "R" if is_piece(orig, rook) else "N" if is_piece(orig, knight) else "B" if is_piece(orig, bishop) else ""
+    name =  "K" if is_piece(orig, king) else "Q" if is_piece(orig, queen) else  "R" if is_piece(orig, rook) else "N" if is_piece(orig, knight) else "B" if is_piece(orig, bishop) else "" if is_piece(orig, pawn) else "?"
     take = not is_empty_cell(board, move[1])
     take_str = 'x' if take else ''
     dest_str = pos_str(move[1])
@@ -82,15 +83,8 @@ def move_str_an(board, all_moves, move):
     # If two pices from the same type can move to the same dest:
     conflict = False
     conflict_same_file = False
-    for m in all_moves:
-        if(np.array_equal(m[0], move[0]) and np.array_equal(m[1], move[1])):
-            continue
-
-        if(np.array_equal(cell(board, m[0]), orig) and np.array_equal(m[1], move[1])):
-            conflict = True
-
-            if(m[0][1] == move[0][1]):
-                conflict_same_file = True
+    
+    # TODO Conflict resolution
             
     # If there are any conflicts in the same file:
     if(conflict_same_file):
@@ -203,7 +197,7 @@ def undo_move_inplace(board, move, undo):
     set_cell(board, move[0], undo[0])
     set_cell(board, move[1], undo[1])
 
-    if(np.abs(orig_piece) == king):
+    if(np.abs(orig_piece) == king and move[0][1] == 4 ):
         if(move[1][1] == 2):
             # left castle
             set_cell(board, np.array([move[0][0], 0]), rook * color)
@@ -215,48 +209,58 @@ def undo_move_inplace(board, move, undo):
             set_cell(board, np.array([move[0][0], 5]), emptyCell)
 
 @njit
-def get_pawn_moves(board, pos, color):
+def get_pawn_moves(board, pos, color, ret, index):
     forward = np.array([-1, 0]) * color
-
-    ret = []
+    
     # move 1 forward:
     next_pos = pos + forward
     if(pos_inside(next_pos) and is_empty_cell(board, next_pos)):
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
     
     # move 2 forward:
     start_y = 6 if color==1 else 1
     next_pos = pos + forward + forward
     if(pos[0] == start_y and is_empty_cell(board, pos + forward) and is_empty_cell(board, next_pos)):
         if(not pos_inside(next_pos)):
+            print("board:")
+            print(board)
+            print("pos:")
+            print(pos)
+            print("color:")
+            print(color)
             raise Exception("pos")
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
 
     # take:
     next_pos = pos + forward + np.array([0, 1])
     if(has_piece(board, next_pos, -color)):
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
 
     next_pos = pos + forward + np.array([0, -1])
     if(has_piece(board, next_pos, -color)):
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
 
-    return ret
+    return index
 
 bishop_vectors = np.array([[-1, -1], [-1, 1], [1, -1], [1, 1]])
 rook_vectors = np.array([[0, 1], [0, -1], [1, 0], [-1, 0]])
 queen_vectors = np.concatenate((bishop_vectors, rook_vectors))
 
 @njit
-def get_king_moves(board, pos, color):
-    ret = []
+def get_king_moves(board, pos, color, ret, index):
     for vector in queen_vectors:
         next_pos = pos + vector
         if(not pos_inside(next_pos)):
             continue
         if(has_piece(board, next_pos, color)):
             continue
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
+
 
     # Castling:
     l_rook_pos = np.array([pos[0], 0])
@@ -271,7 +275,8 @@ def get_king_moves(board, pos, color):
        is_empty_cell(board, l_rook_pos_e2)  and 
        is_empty_cell(board, l_rook_pos_e3)
     ):
-        ret.append(l_rook_pos_e2)
+        ret[index, 1] = l_rook_pos_e2
+        index += 1
 
     r_rook_pos = np.array([pos[0], 7])
     r_rook_pos_e1 = np.array([pos[0], 5])
@@ -282,35 +287,35 @@ def get_king_moves(board, pos, color):
        is_empty_cell(board, r_rook_pos_e1) and 
        is_empty_cell(board, r_rook_pos_e2)
     ):
-        ret.append(r_rook_pos_e2)
+        ret[index, 1] = r_rook_pos_e2
+        index += 1
 
-    return ret
+    return index
 
 @njit
-def get_ray_moves(board: npt.NDArray[np.float32], pos: npt.NDArray[np.int64], forward: npt.NDArray[np.int64], color: np.float32) -> list[npt.NDArray[np.int64]]:
-    ret = []
+def get_ray_moves(board: npt.NDArray[np.float32], pos: npt.NDArray[np.int64], forward: npt.NDArray[np.int64], color: np.float32, ret, index):
     while True:
         pos = pos + forward
         # check bounds or piece blocking
         if((not pos_inside(pos)) or has_piece(board, pos, color)):
             break
         
-        ret.append(pos)
+        ret[index, 1] = pos
+        index += 1
 
         # take
         if(has_piece(board, pos, -color)):
             break
-    return ret
+    return index
 
 @njit
-def get_vector_moves(board, pos, vectors, color) -> list[npt.NDArray[np.int64]]:
-    ret = [np.array([0,0], dtype=np.int64) for x in range(0)]
+def get_vector_moves(board, pos, vectors, color, ret, index):
     for vector in vectors:
-        ret += get_ray_moves(board, pos, vector, color)
-    return ret
+        index = get_ray_moves(board, pos, vector, color, ret, index)
+    return index
 
 @njit
-def get_knight_moves(board, pos, color):
+def get_knight_moves(board, pos, color, ret, index):
     vectors = np.array([
         [2, 1],
         [1, 2],
@@ -325,43 +330,59 @@ def get_knight_moves(board, pos, color):
         [1, -2],
         ])
 
-    ret = []
     for vector in vectors:
         next_pos = pos + vector
         if(not pos_inside(next_pos) or has_piece(board, next_pos, color)):
             continue
         
-        ret.append(next_pos)
+        ret[index, 1] = next_pos
+        index += 1
 
-    return ret
+    return index
+
+
+@njit
+def allocate_moves_array():
+    return np.empty((1024, 2, 2), np.int64)
+
+@njit
+def get_all_moves_slow(board, color):
+    ret = np.empty((128, 2, 2), np.int64)
+    count = get_all_moves(board, color, ret, 0)
+    return ret[0:count]
 
 # Get a list of all possible moves, this is a pure function since moves are indexable
 @njit
-def get_all_moves(board, color):
-    ret = [(np.array([0,0]), np.array([0,0])) for x in range(0)]
-
+def get_all_moves(board, color, ret, index):
+    """
+    Fills ret with a list of moves, returns the index of the next move in the array
+    """
     if(evalWin(board) != 0): 
-        return ret
+        return index
+    
+    if(evalDeadPosition(board)):
+        return index
     
     for y in range(0, 8):
         for x in range(0, 8):
             pos = np.array([y, x])
             cell = board[y, x]
-            curr_ret = [np.array([0,0]) for x in range(0)]
-            if(is_piece(cell, pawn, color)):
-                curr_ret += get_pawn_moves(board, pos, color)
-            elif (is_piece(cell, knight, color)):
-                curr_ret += get_knight_moves(board, pos, color)
-            elif (is_piece(cell, king, color)):
-                curr_ret += get_king_moves(board, pos, color)
-            elif (is_piece(cell, queen, color)):
-                curr_ret += get_vector_moves(board, pos, queen_vectors, color)
-            elif (is_piece(cell, bishop, color)):
-                curr_ret += get_vector_moves(board, pos, bishop_vectors, color)
-            elif (is_piece(cell, rook, color)):
-                curr_ret += get_vector_moves(board, pos, rook_vectors, color)
+            start_index = index
 
-            for next_pos in curr_ret:
-                ret.append((pos, next_pos))
-    
-    return ret
+            if (is_piece(cell, king, color)):
+                index = get_king_moves(board, pos, color, ret, index)
+            elif (is_piece(cell, queen, color)):
+                index = get_vector_moves(board, pos, queen_vectors, color, ret, index)
+            elif (is_piece(cell, rook, color)):
+                index = get_vector_moves(board, pos, rook_vectors, color, ret, index)
+            elif (is_piece(cell, bishop, color)):
+                index = get_vector_moves(board, pos, bishop_vectors, color, ret, index)
+            elif (is_piece(cell, knight, color)):
+                index = get_knight_moves(board, pos, color, ret, index)
+            if(is_piece(cell, pawn, color)):
+                index = get_pawn_moves(board, pos, color, ret, index)
+
+            for i in range(start_index, index):
+                ret[i, 0] = pos
+            
+    return index

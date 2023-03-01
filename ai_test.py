@@ -1,24 +1,28 @@
-import tensorflow as tf
-import numpy as np
-from layers import calc_layers, conv2d, get_layer_data
+from eval import evalDeadPosition
+from minmax import iterative_deepening, variation_str, variation_str_an
+from moves import allocate_moves_array
+from view import parse_board, print_board
 
-x = np.random.random(5 * 5 * 3).reshape((5,5,3)).astype(np.float32)
+board = parse_board("""
+8                        
+7       ♝              ♚ 
+6                        
+5                        
+4       ♔                
+3                        
+2                        
+1                ♗       
+  a  b  c  d  e  f  g  h
+""")
+print_board(board)
+print(evalDeadPosition(board))
+exit()
+color = -1
 
+depth = 3
+print(f"depth: {depth}")
+(next_eval, variation, iters, best_depth) = iterative_deepening(depth, 5, 2000, board, color, None, True, allocate_moves_array(), 0)
 
-model = tf.keras.Sequential([
-    tf.keras.Input(shape=(5,5,3)),
-    tf.keras.layers.Conv2D(2, 3, padding="same", activation="swish", bias_initializer='random_normal'),
-    tf.keras.layers.Conv2D(2, 3, padding="same", activation="linear", bias_initializer='random_normal'),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(10, bias_initializer='random_normal', activation="sigmoid")
-])
-model.compile()
-
-y_model = model(np.array([x]))
-
-layer_data = get_layer_data(model.layers)
-y_np = calc_layers(x, layer_data).data1d[0]
-
-print("y_model", y_model)
-print("y_np", y_np)
-print("diff", np.sum(np.abs(y_np - y_model)))
+variation_text = variation_str_an(variation, board, color)
+#variation_text  = variation_str(variation)
+print(f"eval: {next_eval}, variation: {variation_text}, iters: {iters}")

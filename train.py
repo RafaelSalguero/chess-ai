@@ -1,6 +1,6 @@
 import numpy as np
 from eval import evalBoard, evalWin
-from moves import apply_move, apply_move_inplace, flip_board, get_all_moves, move_str_an, moves_str_an, undo_move_inplace
+from moves import allocate_moves_array, apply_move, apply_move_inplace, flip_board, get_all_moves, move_str, move_str_an, moves_str_an, undo_move_inplace
 from test import get_test_boards
 from minmax import iterative_deepening, minimax, variation_str, variation_str_an
 from board import getInitialBoard, initialBoard
@@ -92,6 +92,7 @@ def get_sim_games_inplace(depth, quiescence_depth, max_iter, dest_boards, dest_e
     # duplicates are rare
     initial_copy = np.copy(initialBoard)
     board = np.copy(initial_copy)
+    moves_array = allocate_moves_array()
     
     color = 1
 
@@ -108,8 +109,10 @@ def get_sim_games_inplace(depth, quiescence_depth, max_iter, dest_boards, dest_e
     index += 1
 
     while True:
-        moves = get_all_moves(board, color)
-        if(len(moves)== 0):
+        moves_start_index = 0
+        moves_array_next_index = get_all_moves(board, color, moves_array, moves_start_index)
+        moves_count = moves_array_next_index - moves_start_index
+        if(moves_count== 0):
             if(verbose):
                 print(f'win: {evalWin(board)}')
             color = 1
@@ -123,42 +126,44 @@ def get_sim_games_inplace(depth, quiescence_depth, max_iter, dest_boards, dest_e
         next_variations = []
         ply += 1
 
-        shuffle(moves)
-        for move in moves:
+        moves_view = moves_array[moves_start_index:moves_array_next_index]
+        for move in moves_view:
             undo = apply_move_inplace(board, move)
 
-            (next_eval, variation, iters, best_depth) = iterative_deepening(depth, quiescence_depth, max_iter, board, next_color, ttable, verbose)
+            (next_eval, variation, iters, best_depth) = iterative_deepening(depth, quiescence_depth, max_iter, board, next_color, None if verbose  else ttable, verbose, moves_array, moves_array_next_index)
+            
             next_evals.append(next_eval)
 
+            dest_ply[index + dest_index] = ply
+            dest_evals[index + dest_index] = next_eval
+            dest_boards[index + dest_index] = board                
+            dest_boards[index + dest_index] = dest_boards[index + dest_index] if next_color == 1 else flip_board(dest_boards[index + dest_index])
+
+            index += 1
+            if(index >= size):
+                print(f"games: {game}, boards: {index}")       
+                return
+
+            if(index % 1000 == 0):
+                print(f"{prefix}sim_boards count: {index}/{size}")
+
             if(verbose):
-                (variation_text, _, _) = variation_str_an(variation, board, next_color)
+                variation_text = variation_str(variation)
                 next_variations.append(variation_text)
             
             undo_move_inplace(board, move, undo)
 
         probs = softmax(-np.array(next_evals) * prob_ratio)
-        best = random_choice(probs)
+        choice = random_choice(probs)
+        best = np.argmax(-np.array(next_evals))
 
-        if(verbose):
-            move_st = move_str_an(board, moves, moves[best])
-            # moves_s = moves_str_an(board, moves)
-            # print(moves_s)
-            print(f'{prefix} game: {game} ply: {ply} best: {move_st} ({next_evals[best]}) ({next_variations[best]})')
-
-        board = apply_move(board, moves[best])
+        board = apply_move(board, moves_array[choice])
         color = next_color
 
-        dest_ply[index + dest_index] = ply
-        dest_evals[index + dest_index] = next_evals[best]
-        dest_boards[index + dest_index] = board
         if(verbose):
+            move_st = move_str(moves_array[choice])
+            best_move_st = move_str(moves_array[best])
+            # moves_s = moves_str_an(board, moves)
+            # print(moves_s)
+            print(f'{prefix} game: {game} ply: {ply} choice: {move_st} ({next_evals[choice]}) ({next_variations[choice]}), best: {best_move_st} ({next_evals[best]}) ({next_variations[best]})')
             print_board(board)
-            
-        dest_boards[index + dest_index] = dest_boards[index + dest_index] if next_color == 1 else flip_board(dest_boards[index + dest_index])
-
-        index += 1
-        if(index >= size):
-            return
-
-        if(index % 100 == 0):
-            print(f"{prefix}sim_boards count: {index}/{size}")
