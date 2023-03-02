@@ -36,7 +36,7 @@ def cap_histogram(y, cap, avg_size):
         Returns the picked indices from y
     """
     min_y = np.min(y)
-    bins = np.int64(np.max(y) - min_y)
+    bins = np.arange(-150, 152, 1)
     (h, bins) = np.histogram(y, bins)
     probs = np.zeros(len(h))
     
@@ -57,7 +57,7 @@ def cap_histogram(y, cap, avg_size):
         value = y[y_index]
         bin = round(y[y_index] - min_y)
         prob = probs[bin]
-        if(np.random.random() < prob):
+        if(np.random.uniform(0, 1) < prob):
             indices[out_index] = y_index
             out_index += 1
         

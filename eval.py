@@ -2,19 +2,7 @@ import numpy as np
 from board import king, king_moved, emptyCell, knight, bishop
 from numba import njit
 
-pieceValues = np.array([
-    5, # rook 
-    5, # rook_moved
-    3, # knight
-    3, # bishop
-    9, # queen
-    100, # king
-    100, # king_moved
-    1 # pawn
-], dtype=np.float32)
-
-# Any eval greater than this indicates a win
-win_value_heuristic = 50
+win_value = 150
 
 @njit
 def evalCell(cell):
@@ -77,4 +65,5 @@ def evalBoard(board, color):
     s = np.sign(board)
     a = s * board
 
-    return np.sum(((a == 1) * 5 + (a == 2) * 5 + (a == 3) * 3 + (a == 4) * 3 + (a == 5) * 9 + (a == 6) * 150 + (a == 7) * 150 + (a == 8) * 1) * s) * color
+    king_value = 10000
+    return min(max(np.sum(((a == 1) * 5 + (a == 2) * 5 + (a == 3) * 3 + (a == 4) * 3 + (a == 5) * 9 + (a == 6) * king_value + (a == 7) * king_value + (a == 8) * 1) * s) * color, -win_value), win_value)
