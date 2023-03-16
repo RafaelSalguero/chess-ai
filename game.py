@@ -1,5 +1,5 @@
 from view import print_board
-from moves import move_str, flip_board, flip_move, get_all_moves, move_str_an, apply_move, str_move_an
+from moves import allocate_moves_array, get_all_moves_slow, move_str, flip_board, flip_move, get_all_moves, move_str_an, apply_move, str_move_an
 from minmax import minimax, find_best_move_minimax
 from eval import evalBoard, evalWin
 import numpy as np
@@ -48,31 +48,31 @@ def play(board, color, white_player, black_player, print_evals = True,show_board
     while True:
         max_depth -= 1
         if(max_depth <= 0):
-            return 0
+            return (0, board)
         
         if(show_board):
             print_board(board)
 
         win = evalWin(board)
         if(win != 0):
-            return win
+            return (win, board)
 
         if(print_evals):
             eval_depths = [0, 1, 2, 3]
             evals = np.array(list(map(lambda depth: minimax(board, color, depth, evalBoard)[0], eval_depths)))
             print("minmax eval", evals)
 
-        moves = get_all_moves(board, color)
+        moves = get_all_moves_slow(board, color)
 
         if(len(moves) == 0):
             print("No more moves")
-            return 0
+            return (0, board)
         
         player = white_player if color==1 else black_player
         next_move = player(board, color)
 
         if(show_board):
-            print(move_str_an(board, moves, next_move))
+            print(move_str(next_move))
 
         board = apply_move(board, next_move)
 

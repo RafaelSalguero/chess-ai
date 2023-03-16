@@ -1,4 +1,5 @@
 import numpy as np
+import tensorflow as tf
 from board import king, king_moved, emptyCell, knight, bishop
 from numba import njit
 

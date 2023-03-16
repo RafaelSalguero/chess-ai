@@ -1,4 +1,4 @@
-from moves import apply_move, get_all_moves, get_all_moves_slow, is_empty_cell, move_str, apply_move_inplace, move_str_an, undo_move_inplace
+from moves import allocate_moves_array, apply_move, get_all_moves, get_all_moves_slow, is_empty_cell, move_str, apply_move_inplace, move_str_an, undo_move_inplace
 from eval import evalBoard, win_value
 from numba import njit, deferred_type, int32, optional, typeof
 from numba.experimental import jitclass
@@ -137,7 +137,8 @@ def alphabeta(board, color, quiescence, depth, quiescence_depth, max_iter, alpha
     return (value, best_variation, best_move, iters)
 
 def minimax(board, color, depth, eval_func, calc_variation = False):
-    return alphabeta(board, color, depth, -inf_val, inf_val, eval_func, Variation(None, None) if calc_variation else None)
+    moves_array = allocate_moves_array()
+    return alphabeta(board, color, False, depth,0, 1000000,-inf_val, inf_val, eval_func, Variation(None, None) if calc_variation else None, None, False, moves_array, 0)
 
 @njit
 def iterative_deepening(max_depth, quiescence_depth, max_iter, board, color, ttable, calc_variation, moves_array, moves_array_index):
@@ -164,5 +165,5 @@ def find_best_move_minimax(board, depth, eval_func):
     if(depth < 1):
         raise Exception("Depth should be >= 1")
     
-    (value, best_variation, best_move) = minimax(board, 1, depth, eval_func, False)
+    (value, best_variation, best_move, iters) = minimax(board, 1, depth, eval_func, False)
     return best_move

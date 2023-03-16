@@ -31,7 +31,7 @@ def flip_pos(pos):
 
 @njit
 def flip_move(move):
-    return np.array(list(map(flip_pos, move)))
+    return move * np.array([-1, 1]) + np.array([7, 0])
 
 # Convert string to position
 @njit

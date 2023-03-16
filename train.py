@@ -130,16 +130,34 @@ def get_sim_games_inplace(depth, quiescence_depth, max_iter, dest_boards, dest_e
         for move in moves_view:
             undo = apply_move_inplace(board, move)
 
-            (next_eval, variation, iters, best_depth) = iterative_deepening(depth, quiescence_depth, max_iter, board, next_color, None if verbose  else ttable, verbose, moves_array, moves_array_next_index)
-            
-            next_evals.append(next_eval)
+            win = evalWin(board)
+            if(win == 0):
+                (next_eval, variation, iters, best_depth) = iterative_deepening(depth, quiescence_depth, max_iter, board, next_color, None if verbose  else ttable, verbose, moves_array, moves_array_next_index)
+                
+                next_evals.append(next_eval)
 
-            dest_ply[index + dest_index] = ply
-            dest_evals[index + dest_index] = next_eval
-            dest_boards[index + dest_index] = board                
-            dest_boards[index + dest_index] = dest_boards[index + dest_index] if next_color == 1 else flip_board(dest_boards[index + dest_index])
+                dest_ply[index + dest_index] = ply
+                dest_evals[index + dest_index] = next_eval
+                dest_boards[index + dest_index] = board                
+                dest_boards[index + dest_index] = dest_boards[index + dest_index] if next_color == 1 else flip_board(dest_boards[index + dest_index])
 
-            index += 1
+                index += 1
+            else:
+                # A win position is simetrical in its evaluation, color doesn't matter, so we register it with both colors:
+                # If we don't do this, only black wins positions are registered because of the board flipping
+                dest_ply[index + dest_index] = ply
+                dest_evals[index + dest_index] = evalBoard(board, 1)
+                dest_boards[index + dest_index] = board                
+
+                index += 1
+
+                dest_ply[index + dest_index] = ply
+                dest_evals[index + dest_index] = evalBoard(board, -1)
+                dest_boards[index + dest_index] = board                
+                dest_boards[index + dest_index] = flip_board(dest_boards[index + dest_index])               
+
+                index += 1
+
             if(index >= size):
                 print(f"games: {game}, boards: {index}")       
                 return
