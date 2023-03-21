@@ -31,7 +31,7 @@ def get_train_data(depth, quiescence_depth, max_iter, size, cache = False):
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
 print("generating train data")
-(x_train, y_train, ply_train) = get_train_data(10, 5, 100, 100000, True)
+(x_train, y_train, ply_train) = get_train_data(10, 5, 300, 10000000, True)
 
 if(False):
     indices = cap_histogram(y_train, 20000, 1)
@@ -44,7 +44,7 @@ if(False):
 
 print("generating test data")
 
-(x_test, y_test, ply_test) = get_train_data(10, 5, 100, 10000, True)
+(x_test, y_test, ply_test) = get_train_data(10, 5, 100, 800000, True)
 
 print(f"train sample {x_train.shape[0]} {y_train.shape[0]}:")
 
@@ -85,11 +85,9 @@ def create_model():
     x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
     x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
     x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
 
     x = tf.keras.layers.MaxPooling2D(pool_size=(2,2))(x)
 
-    x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
     x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
     x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
 
@@ -112,7 +110,7 @@ model.compile(optimizer='adam', loss='mean_squared_error', metrics=[tf.keras.met
 
 print("train size: " + str(x_train.shape[0]))
 
-model.fit(model_x_train, model_y_train, validation_data = (model_x_test, model_y_test), epochs=50, batch_size=64)
+model.fit(model_x_train, model_y_train, validation_data = (model_x_test, model_y_test), epochs=25, batch_size=64)
 
 model.save("models/alpha_beta_3")
 

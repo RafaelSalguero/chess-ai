@@ -10,18 +10,14 @@ from utils import onehot_encode_board, softmax
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
 
-model = tf.keras.models.load_model("models/alpha_beta_3_10M")
+model = tf.keras.models.load_model("models/alpha_beta_3_10M_e4")
 
 @tf.function    
 def internal_model_eval_no_win_check(model, x):
     return model(x)
     
 def internal_model_eval(model, x):
-    win = evalWin(x)
-    if(win != 0):
-        return win * 1000
-    else:
-        return from_model_space(internal_model_eval_no_win_check(model, onehot_encode_board(x).reshape((-1, 8, 8, 8)))).sum()
+   return from_model_space(internal_model_eval_no_win_check(model, onehot_encode_board(x).reshape((-1, 8, 8, 8))).numpy().reshape(-1))
 
 def from_model_space(x):
     return np.power((x - 0.5) * (2 * np.cbrt(150)), 3)
@@ -32,7 +28,7 @@ def find_best_move_ai(model, board, verbose = False):
     moves = get_all_moves_slow(board, 1)
     boards = np.array(list(map(lambda move: flip_board(apply_move(board, move)), moves)))
     
-    evals =  -np.array(list(map(lambda board: internal_model_eval(model, board), boards)))
+    evals = -internal_model_eval(model, boards)
 
     probs = softmax(evals)
 

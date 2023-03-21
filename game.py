@@ -91,7 +91,8 @@ def simulateGames(board, a, b, count, print_games = False, print_messages = True
         player_color_msg = 'white' if color == 1 else 'black'
         if(print_messages):
             print(f'Simulating game {i}/{count}, a = {player_color_msg}')
-        win = play(board, 1, a, b, False, print_games, False) * color
+        (win, _) = play(board, 1, a, b, False, print_games, False)
+        win = win * color
         
         if(win == 0):
             draws+=1
