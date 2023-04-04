@@ -1,6 +1,8 @@
+from ai_train import get_train_data
 from eval import evalWin
+from mcts import mcts
 from minmax import iterative_deepening, variation_str
-from moves import allocate_moves_array, apply_move, flip_board, get_all_moves, get_all_moves_slow
+from moves import allocate_moves_array, apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
 from utils import onehot_encode_board
 from view import parse_board, print_board
 import numpy as np
@@ -10,7 +12,7 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 
 
-model = tf.keras.models.load_model("models/alpha_beta_3_10M_e4")
+model = tf.keras.models.load_model("models/alpha_beta_3_8M_300_it")
 
 @tf.function    
 def internal_model_eval_no_win_check(model, x):
@@ -23,27 +25,20 @@ def from_model_space(x):
     return np.power((x - 0.5) * (2 * np.cbrt(150)), 3)
 
 
-board = parse_board(
+board = flip_board(parse_board(
 """
-8       ♝  ♛  ♚  ♝  ♞  ♜ 
-7       ♟  ♟  ♟  ♟  ♟  ♟ 
-6       ♞                
-5          ♜        ♗    
-4                        
-3                      ♘ 
-2    ♖     ♔  ♗  ♙  ♙  ♙ 
-1          ♕        ♖    
+8 ♜  ♞  ♝  ♛  ♚     ♞  ♜ 
+7       ♟  ♟  ♟  ♟  ♝  ♟ 
+6                   ♟    
+5                        
+4                      ♙ 
+3                        
+2 ♙  ♟  ♘  ♙  ♙  ♙  ♙    
+1 ♖     ♗  ♕  ♔  ♗     ♖ 
   a  b  c  d  e  f  g  h
 """
-)
+))
+move = mcts(board, 1, model, 5000)
 
-all_moves = get_all_moves_slow(board, -1)
-next_boards = list(map(lambda move: (apply_move(board, move)), all_moves))
-
-for next_board in next_boards:
-    print_board(next_board)
-    print(internal_model_eval(model, next_board))
-    (value, variation, _, _) = iterative_deepening(2, 2, 100, next_board, 1, None, True, allocate_moves_array(), 0)
-
-    print(value)
-    print(variation_str(variation))
+print_board(board)
+print(move_str(move))

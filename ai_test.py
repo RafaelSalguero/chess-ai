@@ -10,7 +10,7 @@ from utils import onehot_encode_board, softmax
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
 
-model = tf.keras.models.load_model("models/alpha_beta_3_10M_e4")
+model = tf.keras.models.load_model("models/alpha_beta_3")
 
 @tf.function    
 def internal_model_eval_no_win_check(model, x):
@@ -46,17 +46,17 @@ def find_best_move_sim(player, board, verbose = False):
     boards = np.array(list(map(lambda move: apply_move(board, move), moves)))
     
     wins = np.zeros(boards.shape[0])
-    iterations = 15
+    iterations = 30
 
     for iteration in range(iterations):
       for i, subboard in enumerate(boards):
-          (win, last_board) = play(subboard, -1, player, player, False, False, False, 500)
-          wins[i] += win
+          (win, last_board) = play(subboard, -1, player, player, False, False, False, 100)
+          wins[i] += evalBoard(last_board, 1)
 
-      print(list(zip(wins, map(move_str, moves))))
+      #print(list(zip(wins, map(move_str, moves))))
       best_move_i = np.argmax(wins);
       best_move = moves[best_move_i]
-      print(f"it: {iteration} best move: {best_move_i} {move_str(best_move)} ({wins[best_move_i]})")
+      #print(f"it: {iteration} best move: {best_move_i} {move_str(best_move)} ({wins[best_move_i]})")
 
     return best_move
 
@@ -80,5 +80,5 @@ def sim_player(model, verbose = False):
     
     return player
 
-win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(2), 100, True)
+win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(2), 1, True)
 print("win_rate: ", win_rate)

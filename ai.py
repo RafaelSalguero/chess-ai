@@ -1,3 +1,4 @@
+from ai_train import get_train_data, reduce_non_wins
 from minmax import alphabeta, iterative_deepening, inf_val, minimax
 import tensorflow as tf
 
@@ -17,24 +18,23 @@ tf.config.set_visible_devices([], 'GPU')
 # Piece types: 0 Pawn, 1 Knight,  2 Bishop, 3 Rook, 4 Queen, 5 King
 
 
-def get_train_data(depth, quiescence_depth, max_iter, size, cache = False):
-    file_name = f'train_data/get_sim_games_{depth}_{max_iter}_{size}.npz'
-    if(cache and os.path.isfile(file_name)):
-        with np.load(file_name) as data:
-            return (data['x'], data['y'], data['ply'])
-        
-    (x, y, ply) = get_sim_games(depth, quiescence_depth, max_iter, size=size, threads=8, verbose=False)
 
-    if (cache):
-        np.savez_compressed(file_name, x=x, y=y, ply=ply)
-    return (x, y, ply)
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
 print("generating train data")
-(x_train, y_train, ply_train) = get_train_data(10, 5, 300, 10000000, True)
+(x_train, y_train, ply_train) = get_train_data(10, 5, 300, 20000000, True)
 
-if(False):
-    indices = cap_histogram(y_train, 20000, 1)
+print("generating test data")
+
+(x_test, y_test, ply_test) = get_train_data(10, 5, 300, 1000000, True)
+
+if(True):
+    reduce_non_wins(x_train, y_train)
+    reduce_non_wins(x_test, y_test)
+
+if(True):
+    # cap histogram
+    indices = cap_histogram(y_train, 200000, 1)
 
     print(f"original len: {len(y_train)}")
     x_train = x_train[indices]
@@ -42,14 +42,19 @@ if(False):
 
     print(f"capped len: {len(y_train)}")
 
-print("generating test data")
+    bins = np.arange(-150, 152, 1)
+    (h, bins) = np.histogram(y_train, bins)
+    print(h)
+# exit()
 
-(x_test, y_test, ply_test) = get_train_data(10, 5, 100, 800000, True)
 
 print(f"train sample {x_train.shape[0]} {y_train.shape[0]}:")
 
 def from_model_space(x):
     return np.pow((x - 0.5) * (2 * np.cbrt(150)), 3)
+
+def from_model_space_tf(x):
+    return tf.math.pow((x - 0.5) * (10.6265), 3)
 
 def to_model_space(x):
     """
@@ -74,19 +79,16 @@ model_x_train = onehot_encode_board(x_train)
 model_y_train = to_model_space(y_train)
 model_y_test = to_model_space(y_test)
 
-print(min(model_y_train))
-print(max(model_y_train))
-
 def create_model():
     inputs = tf.keras.Input(shape=(8,8,8))
 
     x = inputs
 
-    x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(16, 7, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
 
-    x = tf.keras.layers.MaxPooling2D(pool_size=(2,2))(x)
+    x = tf.keras.layers.AveragePooling2D(pool_size=(2,2))(x)
 
     x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
     x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
@@ -110,7 +112,7 @@ model.compile(optimizer='adam', loss='mean_squared_error', metrics=[tf.keras.met
 
 print("train size: " + str(x_train.shape[0]))
 
-model.fit(model_x_train, model_y_train, validation_data = (model_x_test, model_y_test), epochs=25, batch_size=64)
+model.fit(model_x_train, model_y_train, validation_data = (model_x_test, model_y_test), epochs=50, batch_size=64)
 
 model.save("models/alpha_beta_3")
 
