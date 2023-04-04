@@ -20,13 +20,14 @@ class Node:
         self.t = 0
         # visit count
         self.n = 0
+        self.own_reward = 0
 
-    def _expand(self):
+    def _expand(self, color, model, prior_weight):
         if(self.childs is not None):
             raise Exception("This node is already expanded")
-        self.childs = get_childs(self)
+        self.childs = get_childs(self, color, model, prior_weight)
 
-    def explore(self, c: float, model):
+    def explore(self, c: float, model, prior_weight):
         current = self
 
         # Search for the best child until we find a leaf node
@@ -37,25 +38,38 @@ class Node:
             best_child_index = random.choice(best_child_indices)
             current = current.childs[best_child_index]
 
-        if current.n == 0:
-            current.t += rollout(current, model)
-            current._backprop(1)
-        
-        if current.childs is None:
-            current._expand()
+        if current.n > 0 and current.childs is None:
+            current._expand(self.color, model, prior_weight)
+            if len(current.childs) > 0:
+                current = random.choice(current.childs)
 
-    def _backprop(self, n_inc):
-        parent = self
-        while parent.parent:
-            parent = parent.parent
-            parent.n += n_inc
-            parent.t += self.t * parent.color * self.color
+        reward = current.own_reward #rollout(current, self.color, model)
+        current.own_reward = reward
+        backprop(current, reward)
+
         
             
-
-def get_childs(node: Node):
+def backprop(node: Node, reward):
+    parent = node
+    while parent:
+        parent.n += 1
+        parent.t += reward
+        parent = parent.parent
+    
+def get_childs(node: Node, color, model, prior_weight):
     moves = get_all_moves_slow(node.board, node.color)
-    return list(map(lambda move: Node(node, apply_move(node.board, move), -node.color, move, node.depth + 1), moves))
+
+    def create_node(move, prior_weight):
+        next_board = apply_move(node.board, move)
+        ret = Node(node, next_board, -node.color, move, node.depth + 1)
+        ret.own_reward = rollout(ret, color, model)
+
+        # prior probability:
+        ret.n = prior_weight
+        ret.t = ret.own_reward * prior_weight
+        return ret
+    
+    return list(map(create_node, moves))
 
 @tf.function    
 def internal_model_eval(model, x):
@@ -64,31 +78,37 @@ def internal_model_eval(model, x):
 def from_model_space(x):
     return np.power((x - 0.5) * (2 * np.cbrt(150)), 3)
 
+def eval_to_prob(x):
+    """
+        Maps from [-150, 150] to [-1, 1]
+    """
+    return x / 150
+
 def model_eval(model, color, board):
     b = board
     
     if(color == -1):
         b = flip_board(board)
     
-    nn_eval = True
+    nn_eval = False
     y = 0
     if(nn_eval):
         y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
         y = (y - 0.5) * 2
     else:
-        y = evalBoard(board, 1) / 50
+        y = eval_to_prob(evalBoard(board, color))
 
     return y
 
-def rollout(node: Node, model):
+def rollout(node: Node, color, model):
     win_val = evalWin(node.board)
 
     if(win_val == 0):
-        y = model_eval(model, node.color, node.board)
+        y = model_eval(model, color, node.board)
     else:
-        y = win_val * node.color
+        y = win_val * color
 
-    return -y
+    return y
 
 def getUCBScore(node: Node, c: float):
     """
@@ -99,35 +119,42 @@ def getUCBScore(node: Node, c: float):
     
     parent = node.parent if node.parent else node
     
-    node_score = node.t / node.n
+    node_score = node.t / node.n * -node.color
     exploration_score = math.sqrt(math.log(parent.n) / node.n)
     return node_score + c * exploration_score
 
 def pick_best_child(node: Node):
-    if(node.childs is None): 
+    if(node.childs is None or len(node.childs) == 0): 
         return None
     max_n = max(child.n for child in node.childs)
     max_childs = [child for child in node.childs if child.n == max_n]
 
     return random.choice(max_childs)
 
-def mcts(board: np.array, color: float, model, iterations, c: float = 1):
+def pv_str(node: Node):
+    if(node is None or node.parent is None):
+        return ""
+    
+    return pv_str(node.parent) + "->" + move_str(node.move)
+
+def mcts(board: np.array, color: float, model, iterations, c: float = 1, prior_weight = 2, verbose = False):
     root = Node(None, board, color, None)
     for _ in range(iterations):
-        root.explore(c, model)
+        root.explore(c, model, prior_weight)
 
     # Choose the child with the largest number of visits:
     best_child = pick_best_child(root)
 
-    for child in root.childs:
-        print(f"{move_str(child.move)} ({child.n})")
-
-    print("pv: ")
-    bc = best_child
+    bc = root
     while (bc):
-        print(move_str(bc.move) + "->", end="")
-        bc = pick_best_child(bc)
+        if verbose and bc.childs:
+            for child in bc.childs:
+                print(f"{pv_str(child)} (n: {child.n}) (t: {child.t}) (own_reward: {round(child.own_reward * 100)}%) node_score: {getUCBScore(child, 0)}")
     
-    print("")
-
+        next_bc = pick_best_child(bc)
+        if(next_bc is None):
+            print(f"pv: {pv_str(bc)}")
+        
+        bc = next_bc
+    
     return best_child.move
