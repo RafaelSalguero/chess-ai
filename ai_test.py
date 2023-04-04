@@ -54,7 +54,7 @@ def ai_player(model, verbose = False):
 
 def sim_player(model, verbose = False):
     def find_best(board):
-        return mcts(board, 1, model, 30000, 1.41)
+        return mcts(board, 1, model, 30000, 1.41, 2)
     
     def player (board, color):
         return auto_player(board, color, find_best)

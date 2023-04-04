@@ -59,7 +59,7 @@ def backprop(node: Node, reward):
 def get_childs(node: Node, color, model, prior_weight):
     moves = get_all_moves_slow(node.board, node.color)
 
-    def create_node(move, prior_weight):
+    def create_node(move):
         next_board = apply_move(node.board, move)
         ret = Node(node, next_board, -node.color, move, node.depth + 1)
         ret.own_reward = rollout(ret, color, model)
@@ -121,7 +121,7 @@ def getUCBScore(node: Node, c: float):
     
     node_score = node.t / node.n * -node.color
     exploration_score = math.sqrt(math.log(parent.n) / node.n)
-    return node_score + c * exploration_score
+    return node_score + (c / node.depth) * exploration_score
 
 def pick_best_child(node: Node):
     if(node.childs is None or len(node.childs) == 0): 

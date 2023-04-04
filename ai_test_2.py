@@ -27,18 +27,18 @@ def from_model_space(x):
 
 board = parse_board(
 """
-8       ♝  ♛     ♝  ♞  ♜ 
-7                ♚     ♟ 
-6             ♟          
-5                        
-4                   ♕    
-3 ♙     ♙                
-2 ♙        ♙     ♙  ♙  ♙ 
-1 ♖  ♘  ♗     ♔     ♘  ♖ 
+8 ♜  ♞  ♝  ♛  ♚  ♝  ♞  ♜ 
+7    ♟  ♟  ♟  ♟  ♟  ♟  ♟ 
+6                        
+5 ♟                      
+4 ♕                      
+3       ♙                
+2 ♙  ♙     ♙  ♙  ♙  ♙  ♙ 
+1 ♖  ♘  ♗     ♔  ♗  ♘  ♖ 
   a  b  c  d  e  f  g  h
 """
 )
-move = mcts(board, 1, model, 30000, 1.41, 2, True)
+move = mcts(board, 1, model, 30000, 1.5, 1, True)
 
 print_board(board)
 print(move_str(move))
