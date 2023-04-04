@@ -20,12 +20,26 @@ class Node:
         self.t = 0
         # visit count
         self.n = 0
+        self.prior = 0
         self.own_reward = 0
+        self.is_checkmate = evalWin(board) == -color
+        self.is_check = False
 
     def _expand(self, color, model, prior_weight):
         if(self.childs is not None):
             raise Exception("This node is already expanded")
         self.childs = get_childs(self, color, model, prior_weight)
+
+    def remove_check(self):
+        if(self.parent is None):
+            return
+        self.parent.childs.remove(self)
+        backprop(self.parent, -self.n, -self.t)
+
+        if(len(self.parent.childs) == 0):
+            # No more moves in parent, so this is a checkmate
+            self.own_reward = 1.0
+
 
     def explore(self, c: float, model, prior_weight):
         current = self
@@ -40,20 +54,24 @@ class Node:
 
         if current.n > 0 and current.childs is None:
             current._expand(self.color, model, prior_weight)
+            if(current.is_check):
+                current.remove_check()
+                return
+            
             if len(current.childs) > 0:
                 current = random.choice(current.childs)
 
         reward = current.own_reward #rollout(current, self.color, model)
         current.own_reward = reward
-        backprop(current, reward)
+        backprop(current, 1, reward)
 
         
             
-def backprop(node: Node, reward):
+def backprop(node: Node, n, t):
     parent = node
     while parent:
-        parent.n += 1
-        parent.t += reward
+        parent.n += n
+        parent.t += t
         parent = parent.parent
     
 def get_childs(node: Node, color, model, prior_weight):
@@ -65,8 +83,10 @@ def get_childs(node: Node, color, model, prior_weight):
         ret.own_reward = rollout(ret, color, model)
 
         # prior probability:
-        ret.n = prior_weight
-        ret.t = ret.own_reward * prior_weight
+        ret.prior = ret.own_reward * prior_weight
+        if ret.is_checkmate:
+            node.is_check = True
+
         return ret
     
     return list(map(create_node, moves))
@@ -90,7 +110,7 @@ def model_eval(model, color, board):
     if(color == -1):
         b = flip_board(board)
     
-    nn_eval = False
+    nn_eval = True
     y = 0
     if(nn_eval):
         y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
@@ -101,7 +121,7 @@ def model_eval(model, color, board):
     return y
 
 def rollout(node: Node, color, model):
-    win_val = evalWin(node.board)
+    win_val = evalWin(node.board) * 1.05
 
     if(win_val == 0):
         y = model_eval(model, color, node.board)
@@ -119,7 +139,16 @@ def getUCBScore(node: Node, c: float):
     
     parent = node.parent if node.parent else node
     
-    node_score = node.t / node.n * -node.color
+    if (parent.n == 0):
+        return float('inf')
+    
+    node_score = ((node.prior + node.t) / node.n) * -node.color
+    if(parent.n < 1):
+        print(f"parent {pv_str(parent)} n is {parent.n}")
+
+    if(node.n < 1):
+        print(f"node {pv_str(node)} n is {node.n}")
+
     exploration_score = math.sqrt(math.log(parent.n) / node.n)
     return node_score + (c / node.depth) * exploration_score
 
@@ -149,7 +178,7 @@ def mcts(board: np.array, color: float, model, iterations, c: float = 1, prior_w
     while (bc):
         if verbose and bc.childs:
             for child in bc.childs:
-                print(f"{pv_str(child)} (n: {child.n}) (t: {child.t}) (own_reward: {round(child.own_reward * 100)}%) node_score: {getUCBScore(child, 0)}")
+                print(f"{pv_str(child)} (n: {child.n}) (t: {child.t}) (own_reward: {round(child.own_reward * 100)}%) node_score: {getUCBScore(child, 0)} (check: {child.is_check})")
     
         next_bc = pick_best_child(bc)
         if(next_bc is None):
