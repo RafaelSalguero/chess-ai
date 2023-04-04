@@ -25,20 +25,20 @@ def from_model_space(x):
     return np.power((x - 0.5) * (2 * np.cbrt(150)), 3)
 
 
-board = flip_board(parse_board(
+board = parse_board(
 """
-8 ♜  ♞  ♝  ♛  ♚     ♞  ♜ 
-7       ♟  ♟  ♟  ♟  ♝  ♟ 
-6                   ♟    
-5                        
-4                      ♙ 
-3                        
-2 ♙  ♟  ♘  ♙  ♙  ♙  ♙    
-1 ♖     ♗  ♕  ♔  ♗     ♖ 
+8          ♛  ♚     ♞  ♜ 
+7          ♞  ♟  ♟  ♕    
+6          ♟           ♟ 
+5                   ♜    
+4       ♙     ♙  ♙       
+3       ♖     ♗          
+2       ♔     ♗          
+1                        
   a  b  c  d  e  f  g  h
 """
-))
-move = mcts(board, 1, model, 5000)
+)
+move = mcts(board, 1, model, 5000, 4)
 
 print_board(board)
 print(move_str(move))

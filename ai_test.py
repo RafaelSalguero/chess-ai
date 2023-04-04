@@ -4,13 +4,14 @@ from eval import evalBoard, evalWin
 from game import auto_player, minimax_player, play, simulateGames
 
 from board import initialBoard
+from mcts import mcts
 from moves import apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
 from utils import onehot_encode_board, softmax
 
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
 
-model = tf.keras.models.load_model("models/alpha_beta_3")
+model = tf.keras.models.load_model("models/alpha_beta_3_8M_300_it")
 
 @tf.function    
 def internal_model_eval_no_win_check(model, x):
@@ -40,25 +41,6 @@ def find_best_move_ai(model, board, verbose = False):
         
     return moves[best]
 
-# Finds the best move for white
-def find_best_move_sim(player, board, verbose = False):
-    moves = get_all_moves_slow(board, 1)
-    boards = np.array(list(map(lambda move: apply_move(board, move), moves)))
-    
-    wins = np.zeros(boards.shape[0])
-    iterations = 30
-
-    for iteration in range(iterations):
-      for i, subboard in enumerate(boards):
-          (win, last_board) = play(subboard, -1, player, player, False, False, False, 100)
-          wins[i] += evalBoard(last_board, 1)
-
-      #print(list(zip(wins, map(move_str, moves))))
-      best_move_i = np.argmax(wins);
-      best_move = moves[best_move_i]
-      #print(f"it: {iteration} best move: {best_move_i} {move_str(best_move)} ({wins[best_move_i]})")
-
-    return best_move
 
 # creates an AI player for the given model
 def ai_player(model, verbose = False):
@@ -71,9 +53,8 @@ def ai_player(model, verbose = False):
     return player
 
 def sim_player(model, verbose = False):
-    rollout_player = ai_player(model, False)
     def find_best(board):
-        return find_best_move_sim(rollout_player, board)
+        return mcts(board, 1, model, 100000, 1)
     
     def player (board, color):
         return auto_player(board, color, find_best)

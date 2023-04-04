@@ -61,24 +61,34 @@ def get_childs(node: Node):
 def internal_model_eval(model, x):
     return model(x)
 
+def from_model_space(x):
+    return np.power((x - 0.5) * (2 * np.cbrt(150)), 3)
+
 def model_eval(model, color, board):
     b = board
     
-    #y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
+    if(color == -1):
+        b = flip_board(board)
+    
+    nn_eval = True
+    y = 0
+    if(nn_eval):
+        y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
+        y = (y - 0.5) * 2
+    else:
+        y = evalBoard(board, 1) / 50
 
-    #y = (y - 0.5) * 2 * color
-
-    y = -evalBoard(b, color)
-
-
-    print(y)
-    print_board(board)
     return y
 
 def rollout(node: Node, model):
-    move_s =move_str(node.move) if node.move is not None else ""
-    print(f"roll out depth {node.depth}, move: {move_s}, color: {node.color}")
-    return model_eval(model, node.color, node.board)
+    win_val = evalWin(node.board)
+
+    if(win_val == 0):
+        y = model_eval(model, node.color, node.board)
+    else:
+        y = win_val * node.color
+
+    return -y
 
 def getUCBScore(node: Node, c: float):
     """
