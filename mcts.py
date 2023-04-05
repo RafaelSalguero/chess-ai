@@ -116,7 +116,7 @@ def model_eval(model, color, board):
         y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
         y = (y - 0.5) * 2
     else:
-        y = eval_to_prob(evalBoard(board, color))
+        y = eval_to_prob(evalBoard(board, 1))
 
     return y
 

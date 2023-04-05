@@ -54,12 +54,12 @@ def ai_player(model, verbose = False):
 
 def sim_player(model, verbose = False):
     def find_best(board):
-        return mcts(board, 1, model, 10000, 0.5, 3)
+        return mcts(board, 1, model, 15000, 0.8, 5)
     
     def player (board, color):
         return auto_player(board, color, find_best)
     
     return player
 
-win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(2), 1, True)
+win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(4), 20, True)
 print("win_rate: ", win_rate)
