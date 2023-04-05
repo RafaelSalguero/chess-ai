@@ -14,7 +14,7 @@ def get_np_hash(arr):
     return np.abs(np.int64(np.sum((arr + 100) * hash_randoms[0:len])))
 
 
-_onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8)))
+_onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8))).astype(np.float32)
 def onehot_encode_board(x):
     return _onehot_diags[x + 8]
 

@@ -11,6 +11,9 @@ type_swish1d = 2
 type_sigmoid1d = 3
 type_flatten = 4
 type_dense = 5
+type_avg_pooling = 6
+type_relu2d = 7
+type_relu1d = 8
 
 spec = OrderedDict()
 spec['type'] = typeof(0)
@@ -42,12 +45,19 @@ def _get_activation_layer(dims, activation, output_shape):
                 return KerasNumbaLayer(type_sigmoid1d, List([output_array]), None, None, None)
             else:
                 raise Exception(F"Unsupported dims")
+        elif(activation == 'relu'):
+            if(dims == 2):
+                return KerasNumbaLayer(type_relu2d, None, None, List([output_array]), None)
+            if(dims == 1):
+                return KerasNumbaLayer(type_relu1d, List([output_array]), None, None, None)
+            else:
+                raise Exception(F"Unsupported dims")
         elif(activation =="linear"):
             return None
         else:
             raise Exception(f"Only swish and linear activations supported, activation: {activation}")
 
-def shape_equals(a, b):
+def _shape_equals(a, b):
     a_len = len(a)
     if(len(b) != a_len):
         return False
@@ -58,12 +68,15 @@ def shape_equals(a, b):
     return True
 
 def get_layer_data(layers):
+    """
+    Converts a list of keras layers to layer data
+    """
     ret = List([KerasNumbaLayer(type_input, None, None, None, None)])
     for layer in layers:
-        ret += get_single_layer_data(layer)
+        ret += _get_single_layer_data(layer)
     return ret
 
-def get_single_layer_data(layer):
+def _get_single_layer_data(layer):
     output_shape = layer.output.shape.as_list()[1:]
     output_array = np.empty(output_shape, np.float32)
 
@@ -99,13 +112,20 @@ def get_single_layer_data(layer):
         a_layer = _get_activation_layer(1, activation, output_shape)
         if(a_layer is not None):
             ret.append(a_layer)
+    elif(layer.name.startswith("input") or layer.name.startswith("dropout")):
+        return ret
+    elif(layer.name.startswith("average_pooling2d")):
+        pool_size = np.array(layer.pool_size, dtype=np.float32)
+        strides = np.array(layer.strides, dtype=np.float32)
+
+        ret.append(KerasNumbaLayer(type_avg_pooling, List([pool_size, strides]), None, List([output_array]), None ))
     else:
         raise Exception(f"Layer type not supported {layer.name}")
     
     return ret
 
 @generated_jit(nopython=True)
-def set_data(layer: KerasNumbaLayer, data):
+def _set_data(layer: KerasNumbaLayer, data):
     if data.ndim == 1:
         def x(layer: KerasNumbaLayer, data):
             layer.data1d = List([data])
@@ -115,24 +135,24 @@ def set_data(layer: KerasNumbaLayer, data):
             layer.data3d = List([data])
         return x
     else:
-        raise Exception("Unsupported data type")
+        raise Exception(f"Unsupported dims {data.ndim}")
 
 
 @njit
 def calc_layers(input, layers_data: list[KerasNumbaLayer]):
     first_layer = layers_data[0]
-    set_data(first_layer, input)
+    _set_data(first_layer, input)
 
     for i in range(1, len(layers_data)):
         prev = layers_data[i - 1]
         curr = layers_data[i]
 
-        calc_layer(prev, curr)
+        _calc_layer(prev, curr)
 
     return layers_data[-1]
 
 @njit
-def calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
+def _calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
     layer_type = layer.type
     if(layer_type == type_conv2d):
         input = prev_layer.data3d[0]
@@ -141,7 +161,7 @@ def calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
         bias = layer.data1d[0]
         output = layer.data3d[0]
         
-        conv2d(input, output, kernel, bias)
+        _conv2d(input, output, kernel, bias)
     elif(layer_type == type_dense):
         input = prev_layer.data1d[0]
 
@@ -149,28 +169,43 @@ def calc_layer(prev_layer: KerasNumbaLayer, layer: KerasNumbaLayer):
         bias = layer.data1d[1]
         output = layer.data1d[0]
         
-        dense(input, output, kernel, bias)
+        _dense(input, output, kernel, bias)
     elif(layer_type == type_swish2d):
         input = prev_layer.data3d[0]
         output = layer.data3d[0]
-        swish2d(input, output)
+        _swish2d(input, output)
     elif(layer_type == type_swish1d):
         input = prev_layer.data1d[0]
         output = layer.data1d[0]
-        swish1d(input, output)
+        _swish1d(input, output)
     elif(layer_type == type_sigmoid1d):
         input = prev_layer.data1d[0]
         output = layer.data1d[0]
-        sigmoid1d(input, output)
+        _sigmoid1d(input, output)
     elif(layer_type == type_flatten):
         input = prev_layer.data3d[0]
         output = layer.data1d[0]
-        flatten(input, output)
+        _flatten(input, output)
+    elif(layer_type == type_relu2d):
+        input = prev_layer.data3d[0]
+        output = layer.data3d[0]
+        _relu2d(input, output)
+    elif(layer_type == type_relu1d):
+        input = prev_layer.data1d[0]
+        output = layer.data1d[0]
+        _relu1d(input, output)
+    elif(layer_type == type_avg_pooling):
+        input = prev_layer.data3d[0]
+
+        pool_size = layer.data1d[0]
+        strides = layer.data1d[1]
+        output = layer.data3d[0]
+        _avgPool2d(input, output, pool_size, strides)
     else:
         raise Exception(f"Unsupported")
 
 @njit
-def flatten(input, output):
+def _flatten(input, output):
     w = input.shape[0]
     h = input.shape[1]
     channels = input.shape[2]
@@ -184,7 +219,7 @@ def flatten(input, output):
     
     return output
 @njit
-def swish2d(input, output):
+def _swish2d(input, output):
     w = input.shape[0]
     h = input.shape[1]
     channels = input.shape[2]
@@ -197,7 +232,51 @@ def swish2d(input, output):
     return output
 
 @njit
-def swish1d(input, output):
+def _relu2d(input, output):
+    w = input.shape[0]
+    h = input.shape[1]
+    channels = input.shape[2]
+    for x in range(0, w):
+        for y in range(0, h):
+            for c in range(0, channels):
+                input_val = input[x, y, c]
+                output[x, y, c] = max(np.float32(0), input_val)
+    
+    return output
+
+@njit
+def _relu1d(input, output):
+    for i in range(0, len(input)):
+        input_val = input[i]
+        output[i] = max(np.float32(0), input_val)
+    
+    return output
+
+@njit
+def _avgPool2d(input, output, pool_size, strides):
+    in_w = input.shape[0]
+    in_h = input.shape[1]
+    channels = input.shape[2]
+    
+    out_w = np.floor_divide(in_w - pool_size[0], strides[0]) + 1
+    out_h = np.floor_divide(in_h - pool_size[1], strides[1]) + 1
+
+    count = pool_size[0] * pool_size[1]
+    for out_x in range(0, out_w):
+        for out_y in range(0, out_h):
+               for c in range(0, channels):
+                    sum = 0
+                    for in_x in range(out_x * strides[0],out_x * strides[0] + pool_size[0]):
+                        for in_y in range(out_y * strides[1],out_y * strides[1] + pool_size[1]):
+                            sum += input[in_x, in_y, c]
+
+                    avg = sum / count
+                    output[out_x, out_y, c] = avg
+    
+    return output
+
+@njit
+def _swish1d(input, output):
     for i in range(0, len(input)):
         input_val = input[i]
         output[i] = input_val/(1 + np.exp(-input_val))    
@@ -205,7 +284,7 @@ def swish1d(input, output):
     return output
 
 @njit
-def sigmoid1d(input, output):
+def _sigmoid1d(input, output):
     for i in range(0, len(input)):
         input_val = input[i]
         output[i] = 1/(1 + np.exp(-input_val))    
@@ -213,7 +292,7 @@ def sigmoid1d(input, output):
     return output
 
 @njit
-def conv2d(input, output, kernel, bias):
+def _conv2d(input, output, kernel, bias):
     w = input.shape[0]
     h = input.shape[1]
     
@@ -238,7 +317,7 @@ def conv2d(input, output, kernel, bias):
     return output
 
 @njit
-def dense(input, output, kernel, bias):
+def _dense(input, output, kernel, bias):
     for i in range(len(output)):
         output[i] = bias[i]
         for j in range(len(input)):
