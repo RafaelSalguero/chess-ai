@@ -1,3 +1,4 @@
+from utils import get_np_hash
 from view import print_board
 from moves import allocate_moves_array, get_all_moves_slow, move_str, flip_board, flip_move, get_all_moves, move_str_an, apply_move, str_move_an
 from minmax import minimax, find_best_move_minimax
@@ -45,7 +46,17 @@ def minimax_player(depth, eval_func = evalBoard):
     return player
 
 def play(board, color, white_player, black_player, print_evals = True,show_board = True, verbose = True, max_depth = 500):
+    repetition_set = dict()
     while True:
+
+        board_hash = get_np_hash(board)
+        repetition_set[board_hash] = repetition_set[board_hash] + 1 if board_hash in repetition_set else 1
+        if(repetition_set[board_hash] > 3):
+            print("draw by repetition")
+            return (0, board)
+
+
+
         max_depth -= 1
         if(max_depth <= 0):
             return (0, board)
@@ -87,6 +98,7 @@ def simulateGames(board, a, b, count, print_games = False, print_messages = True
     a_wins = 0
     b_wins = 0
     a_rate = 0
+
     for i in range(0, count):
         player_color_msg = 'white' if color == 1 else 'black'
         if(print_messages):

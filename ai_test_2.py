@@ -1,7 +1,7 @@
 from ai_train import get_train_data
 from eval import evalWin
 from layers import calc_layers, get_layer_data
-from mcts_fast import mcts
+from mcts import mcts
 from minmax import iterative_deepening, variation_str
 from moves import allocate_moves_array, apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
 from utils import onehot_encode_board
@@ -44,7 +44,7 @@ board = parse_board(
 )
 
 
-move = mcts(board, 3000, 1, 5, True)
+move = mcts(board, 500, 1, 5, True)
 
 print_board(board)
 print(move_str(move))

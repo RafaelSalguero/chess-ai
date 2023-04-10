@@ -157,7 +157,7 @@ def model_eval(model, color, board):
     return y
 
 def rollout(board, color, model):
-    win_val = evalWin(board) * 1000
+    win_val = evalWin(board) * 1.05
 
     if(win_val == 0):
         y = model_eval(model, color, board)

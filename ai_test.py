@@ -4,8 +4,9 @@ from eval import evalBoard, evalWin
 from game import auto_player, minimax_player, play, simulateGames
 
 from board import initialBoard
-from mcts import mcts
+from mcts_fast import mcts
 from moves import apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
+from ttable import init_transposition_table
 from utils import onehot_encode_board, softmax
 
 # Disable GPU training:
@@ -53,8 +54,9 @@ def ai_player(model, verbose = False):
     return player
 
 def sim_player(model, verbose = False):
+    rep_table = init_transposition_table(16384)
     def find_best(board):
-        return mcts(board, 1, model, 15000, 0.8, 5)
+        return mcts(board, 200000, rep_table, 0.8, 5, False)
     
     def player (board, color):
         return auto_player(board, color, find_best)
