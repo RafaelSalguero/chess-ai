@@ -1,10 +1,10 @@
 from ai_train import get_train_data
 from eval import evalWin
 from layers import calc_layers, get_layer_data
-from mcts_fast import mcts
+from mcts_fast import add_repetition_table_entry, mcts
 from minmax import iterative_deepening, variation_str
-from moves import allocate_moves_array, apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
-from ttable import init_transposition_table
+from moves import allocate_moves_array, apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str, str_move
+from ttable import init_transposition_table, set_transposition_table
 from utils import onehot_encode_board
 from view import parse_board, print_board
 import numpy as np
@@ -32,20 +32,23 @@ def from_model_space(x):
 
 board = parse_board(
 """
-8    ♞        ♚     ♞  ♜ 
-7       ♝           ♟  ♟ 
-6                ♟       
-5                ♙       
-4          ♟             
-3                      ♜ 
-2    ♖     ♙        ♙    
-1                   ♔    
+8                ♚  ♞  ♜ 
+7          ♝             
+6                      ♟ 
+5             ♙     ♟    
+4                        
+3                ♙       
+2    ♜  ♗        ♔  ♙  ♙ 
+1       ♘                
   a  b  c  d  e  f  g  h
 """
 )
 
 
-move = mcts(board, 500, init_transposition_table(1024), 1, 5, True)
+ttable = init_transposition_table(1024)
+add_repetition_table_entry(board, str_move("c1d3"), ttable)
+
+move = mcts(board, 150000, ttable, 2, 5, True)
 
 print_board(board)
 print(move_str(move))

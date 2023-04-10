@@ -34,7 +34,6 @@ def flip_move(move):
     return move * np.array([-1, 1]) + np.array([7, 0])
 
 # Convert string to position
-@njit
 def str_pos(str):
     return np.array([8 - int(str[1]), col_names.index(str[0])])
 
@@ -109,7 +108,6 @@ def str_move_an(board, all_moves, str):
         
     raise Exception("Move was not found")
 
-@njit
 def str_move(str):
     return np.array([str_pos(str[0:2]), str_pos(str[2:4])])
 

@@ -56,12 +56,12 @@ def ai_player(model, verbose = False):
 def sim_player(model, verbose = False):
     rep_table = init_transposition_table(16384)
     def find_best(board):
-        return mcts(board, 200000, rep_table, 0.8, 5, False)
+        return mcts(board, 100000, rep_table, 1.5, 5, False)
     
     def player (board, color):
         return auto_player(board, color, find_best)
     
     return player
 
-win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(4), 20, True)
+win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(4), 1, True)
 print("win_rate: ", win_rate)

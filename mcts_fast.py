@@ -71,11 +71,19 @@ def fill_node(values, indices, moves, undo_moves, parent_index, node_index, boar
     undo_moves[node_index, 1] = undo_move[1]
     
     indices[node_index, key_parent_index] = parent_index
-    indices[node_index, key_depth] = indices[parent_index, key_depth] + 1
+    depth = indices[parent_index, key_depth] + 1
+    indices[node_index, key_depth] = depth
 
-    node_color = get_color(indices, node_index)
-    own_reward = rollout(board, 1, node_color, None, repetition_ttable)
+    node_color = get_color_from_depth(depth)
+    (is_draw, _) = get_transposition_table(repetition_ttable, board, node_color, 1)
+    if(is_draw):
+        # A draw node has no childs, so we initialized as already expanded with 0 childs:
+        indices[node_index, key_child_index] = node_index + 1
+        indices[node_index, key_child_count] = 0
+    
+    own_reward = 0.0 if is_draw else rollout(board, 1, node_color, None)
     is_win = evalWin(board) != 0
+
 
     undo_move_inplace(board, moves[node_index], undo_move)
 
@@ -258,14 +266,10 @@ def model_eval(model, color, board):
     return y
 
 @njit
-def rollout(board, eval_color, node_color, model, ttable):
+def rollout(board, eval_color, node_color, model):
     win_val = evalWin(board) * win_bonus_ratio
 
     if(win_val == 0):
-        (duplicated, _) = get_transposition_table(ttable, board, node_color, 1)
-        if(duplicated):
-            return 0 # draw
-    
         y = model_eval(model, eval_color, board)
     else:
         y = win_val * eval_color
@@ -292,7 +296,7 @@ def add_repetition_table_entry(board, move, ttable):
 @njit
 def mcts(board, iterations, repetition_ttable, c = 1, prior_weight = 2, verbose = False):
     next_child_index = 1
-    max_size = iterations * 10
+    max_size = iterations * 15
     (values, indices, moves, undo_moves) = allocate(max_size)
 
     for it in range(iterations):
