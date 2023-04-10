@@ -44,7 +44,7 @@ board = parse_board(
 )
 
 
-move = mcts(board, 1, None, 15000, 1, 5, True)
+move = mcts(board, 500, 1, 5, True)
 
 print_board(board)
 print(move_str(move))

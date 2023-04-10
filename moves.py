@@ -343,7 +343,7 @@ def get_knight_moves(board, pos, color, ret, index):
 
 @njit
 def allocate_moves_array(size = 1024):
-    return np.empty((1024, 2, 2), np.int64)
+    return np.empty((size, 2, 2), np.int64)
 
 @njit
 def get_all_moves_slow(board, color):
