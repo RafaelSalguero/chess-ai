@@ -7,7 +7,7 @@ from utils import fstr, onehot_encode_board
 from view import print_board
 import tensorflow as tf
 
-enable_remove_checks = False
+enable_remove_checks = True
 
 class Node:
     def __init__(self, parent, childs, own_reward, is_checkmate, color, move, undo_move, depth):
@@ -62,7 +62,7 @@ def explore(_self, c: float, model, prior_weight, board):
         apply_move_inplace(board, move)
 
 
-    if not current.is_check and current.n > 0 and current.childs is None:
+    if current.n > 0 and current.childs is None:
         expand(current, _self.color, model, prior_weight, board)
         undo_moves(current, board)
         
@@ -74,9 +74,6 @@ def explore(_self, c: float, model, prior_weight, board):
             current = current.childs[0]
     else:
         undo_moves(current, board)
-
-    if(current.is_check):
-        return
     
     reward = current.own_reward #rollout(current, self.color, model)
     current.own_reward = reward
@@ -174,6 +171,7 @@ def get_ucb_score(node: Node, c: float):
     parent = node.parent
 
     if(node.is_check):
+        print(f"node {pv_str(node)} is illegal")
         return -math.inf
     
     if (node.n == 0):

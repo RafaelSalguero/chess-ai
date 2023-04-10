@@ -12,18 +12,23 @@ key_parent_index = 0
 key_child_index = 1
 key_child_count = 2
 key_depth = 3
+key_illegal_childs = 4
 
 key_t = 0
 key_n = 1
 key_own_reward = 2
+
+illegal_n = -1.0
+
+win_bonus_ratio = 1.05
 
 @njit
 def allocate(count):
     # (t, n, own_reward)
     values = np.zeros((count, 3), np.float32)
 
-    # (parent_index, child_index, child_count, depth)
-    indices = np.zeros((count, 4), np.int32)
+    # (parent_index, child_index, child_count, depth, illegal_childs)
+    indices = np.zeros((count, 5), np.int32)
 
     moves = allocate_moves_array(count)
     undo_move = np.zeros((count, 2), np.int32)
@@ -66,12 +71,33 @@ def fill_node(values, indices, moves, undo_moves, parent_index, node_index, boar
 
     node_color = get_color(indices, node_index)
     own_reward = rollout(board, 1, node_color, None, repetition_ttable)
+    is_win = evalWin(board) != 0
 
     undo_move_inplace(board, moves[node_index], undo_move)
 
     values[node_index, key_own_reward] = own_reward
+
+    return is_win
     
+@njit
+def remove_illegal(values, indices, moves, node_index):
+    """
+        Remove the current node from the stats, the node will still be on the child list
+    """
+    print(f"removing illegal {pv_str(indices, moves, node_index)}")
+
+    backprop(values, indices, node_index, -values[node_index, key_n], -values[node_index, key_t])
+    # Remove all childs, since an illegal move can't have following moves:
+    indices[node_index, key_child_count] = 0
+    values[node_index, key_n] = illegal_n
     
+    parent_index = indices[node_index, key_parent_index]
+    indices[parent_index, key_illegal_childs] += 1
+
+    if(indices[parent_index, key_child_count] == indices[parent_index, key_illegal_childs]):
+        # No more moves in parent, so this is a checkmate
+        values[parent_index, key_own_reward] = win_bonus_ratio
+        print(f"checkmate found in {pv_str(indices, moves, parent_index)}")    
 
 @njit
 def expand(values, indices, moves, undo_moves, node_index, first_child_index, board, repetition_ttable):
@@ -85,7 +111,13 @@ def expand(values, indices, moves, undo_moves, node_index, first_child_index, bo
     indices[node_index, key_child_count] = child_count
 
     for child_index in range(first_child_index, last_move_index):
-        fill_node(values, indices, moves, undo_moves, node_index, child_index, board, repetition_ttable)
+        is_win = fill_node(values, indices, moves, undo_moves, node_index, child_index, board, repetition_ttable)
+        if is_win:
+            print(f"king take found: {pv_str(indices, moves, child_index)}")
+            # This is an illegal move, thus, it has no child moves
+            return False
+        
+    return True
 
 @njit
 def undo_moves_rec(indices, moves, undo_moves, node_index, board):
@@ -104,10 +136,13 @@ def explore(values, indices, moves, undo_moves, c: float, prior_weight, board, n
         apply_move_inplace(board, move)
 
     if values[current_index, key_n] > 0 and not is_expanded(indices, current_index):
-        expand(values, indices, moves, undo_moves, current_index, next_child_index, board, repetition_ttable)
+        is_legal_move = expand(values, indices, moves, undo_moves, current_index, next_child_index, board, repetition_ttable)
         undo_moves_rec(indices, moves, undo_moves, current_index, board)
 
-
+        if(not is_legal_move):
+            remove_illegal(values, indices, moves, current_index)
+            return next_child_index
+        
         child_count = indices[current_index, key_child_count]
         next_child_index += child_count
 
@@ -153,6 +188,8 @@ def get_ucb_score(values, indices, node_index, c, prior_reward):
     n = values[node_index, key_n]
     if(n == 0):
         return math.inf
+    if(n == illegal_n):
+        return -math.inf
     
     prior = values[node_index, key_own_reward] * prior_reward
     t = values[node_index, key_t]
@@ -210,7 +247,7 @@ def model_eval(model, color, board):
 
 @njit
 def rollout(board, eval_color, node_color, model, ttable):
-    win_val = evalWin(board) * 1.05
+    win_val = evalWin(board) * win_bonus_ratio
 
     if(win_val == 0):
         (duplicated, _) = get_transposition_table(ttable, board, node_color, 1)
