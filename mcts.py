@@ -1,18 +1,18 @@
-import random
+from collections import OrderedDict
 import numpy as np
 import math
 from eval import evalBoard, evalWin
-from moves import apply_move, flip_board, get_all_moves_slow, move_str
-from utils import onehot_encode_board
+from moves import allocate_moves_array, apply_move, apply_move_inplace, flip_board, get_all_moves, get_all_moves_slow, move_str, undo_move_inplace
+from utils import fstr, onehot_encode_board
 from view import print_board
 import tensorflow as tf
 
 class Node:
-    def __init__(self, parent, board: np.array, color: float = 1, move: np.array = None, depth = 0):
+    def __init__(self, parent, childs, own_reward, is_checkmate, color, move, undo_move, depth):
         self.parent = parent
-        self.board = board
-        self.childs = None
+        self.childs = childs
         self.move = move
+        self.undo_move = undo_move
         self.color = color
         self.depth = depth
         
@@ -21,75 +21,105 @@ class Node:
         # visit count
         self.n = 0
         self.prior = 0
-        self.own_reward = 0
-        self.is_checkmate = evalWin(board) == -color
+        self.own_reward = own_reward
+        self.is_checkmate = is_checkmate
         self.is_check = False
+        self.childs_check_count = 0
 
-    def _expand(self, color, model, prior_weight):
-        if(self.childs is not None):
-            raise Exception("This node is already expanded")
-        self.childs = get_childs(self, color, model, prior_weight)
+def expand(_self, color,  model, prior_weight, board):
+    if(_self.childs is not None):
+        print("This node is already expanded")
+    
+    _self.childs = get_childs(_self, color, model, prior_weight, board)
 
-    def remove_check(self):
-        if(self.parent is None):
-            return
-        self.parent.childs.remove(self)
-        backprop(self.parent, -self.n, -self.t)
+def remove_check(_self):
+    """
+        Remove the current node from the stats, the node will still be on the child list
+    """
+    if(_self.parent is None):
+        return
+    print(f"removing check {pv_str(_self)}")
+    backprop(_self, -_self.n, -_self.t)
+    
+    _self.parent.childs_check_count += 1
 
-        if(len(self.parent.childs) == 0):
-            # No more moves in parent, so this is a checkmate
-            self.own_reward = 1.0
+    if(len(_self.parent.childs) == _self.parent.childs_check_count):
+        # No more moves in parent, so this is a checkmate
+        _self.parent.own_reward = 1.0
+        print(f"checkmate found in {pv_str(_self.parent)}")
 
-
-    def explore(self, c: float, model, prior_weight):
-        current = self
-
-        # Search for the best child until we find a leaf node
-        while current.childs is not None and len(current.childs) > 0:
-            child_scores = [getUCBScore(child, c) for child in current.childs]
-            max_score = max(child_scores)
-            best_child_indices = [i for i, score in enumerate(child_scores) if score == max_score]
-            best_child_index = random.choice(best_child_indices)
-            current = current.childs[best_child_index]
-
-        if current.n > 0 and current.childs is None:
-            current._expand(self.color, model, prior_weight)
-            if(current.is_check):
-                current.remove_check()
-                return
-            
-            if len(current.childs) > 0:
-                current = random.choice(current.childs)
-
-        reward = current.own_reward #rollout(current, self.color, model)
-        current.own_reward = reward
-        backprop(current, 1, reward)
-
+def explore(_self, c: float, model, prior_weight, board):
+    current = _self
+    # Search for the best child until we find a leaf node
+    while current.childs is not None and len(current.childs) > 0:
+        current = pick_child_best_ucb(current.childs, c)
         
-            
+        move = current.move
+        apply_move_inplace(board, move)
+
+
+    if not current.is_check and current.n > 0 and current.childs is None:
+        expand(current, _self.color, model, prior_weight, board)
+        undo_moves(current, board)
+        
+        if(current.is_check):
+            remove_check(current)
+            return
+        
+        if len(current.childs) > 0:
+            current = current.childs[0]
+    else:
+        undo_moves(current, board)
+
+    if(current.is_check):
+        return
+    
+    reward = current.own_reward #rollout(current, self.color, model)
+    current.own_reward = reward
+    backprop(current, 1, reward)
+
+    
+def undo_moves(node: Node, board):
+    while node is not None and node.parent is not None:
+        undo_move_inplace(board, node.move, node.undo_move)
+        node = node.parent
+
 def backprop(node: Node, n, t):
     parent = node
-    while parent:
-        parent.n += n
+    while parent is not None:
+        parent.n = parent.n + n
         parent.t += t
         parent = parent.parent
     
-def get_childs(node: Node, color, model, prior_weight):
-    moves = get_all_moves_slow(node.board, node.color)
+def create_node(board, move, parent, prior_weight, eval_color, model):
+    undo_move = apply_move_inplace(board, move)
 
-    def create_node(move):
-        next_board = apply_move(node.board, move)
-        ret = Node(node, next_board, -node.color, move, node.depth + 1)
-        ret.own_reward = rollout(ret, color, model)
+    own_reward = rollout(board, eval_color, model)
+    is_checkmate = evalWin(board) != 0
 
-        # prior probability:
-        ret.prior = ret.own_reward * prior_weight
-        if ret.is_checkmate:
-            node.is_check = True
+    undo_move_inplace(board, move, undo_move)
 
-        return ret
+    ret = Node(parent, None, own_reward, is_checkmate, -parent.color, move, undo_move, parent.depth + 1)
+    #ret = Node(None, None, 0.0, False, 1, move, undo_move, 1)
+
+    # prior probability:
+    ret.prior = ret.own_reward * prior_weight
+    if ret.is_checkmate:
+        parent.is_check = True
+
+    return ret
     
-    return list(map(create_node, moves))
+def get_childs(parent: Node, eval_color, model, prior_weight, board):
+    """
+        Gets node children and sets the is_check flag for the given node
+    """
+    moves = get_all_moves_slow(board, parent.color)
+    
+    childs = []
+    for move in moves:
+        childs.append(create_node(board, move, parent, prior_weight, eval_color, model))
+
+    return childs
 
 @tf.function    
 def internal_model_eval(model, x):
@@ -102,7 +132,7 @@ def eval_to_prob(x):
     """
         Maps from [-150, 150] to [-1, 1]
     """
-    return x / 150
+    return np.cbrt(x) / np.cbrt(150)
 
 def model_eval(model, color, board):
     b = board
@@ -110,55 +140,74 @@ def model_eval(model, color, board):
     if(color == -1):
         b = flip_board(board)
     
-    nn_eval = True
+    nn_eval = False
     y = 0
     if(nn_eval):
-        y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
-        y = (y - 0.5) * 2
+        # y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
+        # y = (y - 0.5) * 2
+        y = 0.0
     else:
         y = eval_to_prob(evalBoard(board, 1))
 
     return y
 
-def rollout(node: Node, color, model):
-    win_val = evalWin(node.board) * 1.05
+def rollout(board, color, model):
+    win_val = evalWin(board) * 1.05
 
     if(win_val == 0):
-        y = model_eval(model, color, node.board)
+        y = model_eval(model, color, board)
     else:
         y = win_val * color
 
     return y
 
-def getUCBScore(node: Node, c: float):
+def get_ucb_score(node: Node, c: float):
     """
         Gets the UCB score, the tree search will explore nodes with higher scores first
     """
+
+    parent = node.parent
+
+    if(node.is_check):
+        return -math.inf
+    
     if (node.n == 0):
-        return float('inf')
-    
-    parent = node.parent if node.parent else node
-    
-    if (parent.n == 0):
-        return float('inf')
+        return math.inf
     
     node_score = ((node.prior + node.t) / node.n) * -node.color
-    if(parent.n < 1):
-        print(f"parent {pv_str(parent)} n is {parent.n}")
 
-    if(node.n < 1):
-        print(f"node {pv_str(node)} n is {node.n}")
 
     exploration_score = math.sqrt(math.log(parent.n) / node.n)
+
     return node_score + (c / node.depth) * exploration_score
 
-def pick_best_child(node: Node):
-    if(node.childs is None or len(node.childs) == 0): 
+def pick_child_best_n(childs: list[Node]):
+    if(childs is None or len(childs) == 0):
         return None
-    max_n = max(child.n for child in node.childs)
-    max_childs = [child for child in node.childs if child.n == max_n]
+    
+    best_node = childs[0]
+    max_value = -math.inf
 
-    return random.choice(max_childs)
+    for child in childs:
+        value = child.n
+        if(value > max_value):
+            max_value = value
+            best_node = child
+
+    return best_node
+
+
+def pick_child_best_ucb(childs: list[Node], c: float):
+    best_node = childs[0]
+    max_value = -math.inf
+
+    for child in childs:
+        value = get_ucb_score(child, c)
+        if(value > max_value):
+            max_value = value
+            best_node = child
+
+    return best_node
 
 def pv_str(node: Node):
     if(node is None or node.parent is None):
@@ -167,20 +216,21 @@ def pv_str(node: Node):
     return pv_str(node.parent) + "->" + move_str(node.move)
 
 def mcts(board: np.array, color: float, model, iterations, c: float = 1, prior_weight = 2, verbose = False):
-    root = Node(None, board, color, None)
+    root = Node(None, None, 0, False, color, None, None, 0)
+    
     for _ in range(iterations):
-        root.explore(c, model, prior_weight)
+        explore(root, c, model, prior_weight, board)
 
     # Choose the child with the largest number of visits:
-    best_child = pick_best_child(root)
+    best_child = pick_child_best_n(root.childs)
 
     bc = root
-    while (bc):
-        if verbose and bc.childs:
+    while bc is not None:
+        if verbose and bc.childs is not None:
             for child in bc.childs:
-                print(f"{pv_str(child)} (n: {child.n}) (t: {child.t}) (own_reward: {round(child.own_reward * 100)}%) node_score: {getUCBScore(child, 0)} (check: {child.is_check})")
+                print(f"{pv_str(child)} (n: {child.n}) (t: {fstr(child.t)}) (own_reward: {round(child.own_reward * 100)}%) node_score: {fstr(get_ucb_score(child, 0))} (check: {child.is_check})")
     
-        next_bc = pick_best_child(bc)
+        next_bc = pick_child_best_n(bc.childs)
         if(next_bc is None):
             print(f"pv: {pv_str(bc)}")
         

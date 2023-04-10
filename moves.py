@@ -342,7 +342,7 @@ def get_knight_moves(board, pos, color, ret, index):
 
 
 @njit
-def allocate_moves_array():
+def allocate_moves_array(size = 1024):
     return np.empty((1024, 2, 2), np.int64)
 
 @njit
@@ -352,7 +352,7 @@ def get_all_moves_slow(board, color):
     return ret[0:count]
 
 # Get a list of all possible moves, this is a pure function since moves are indexable
-@njit
+@njit(boundscheck=True)
 def get_all_moves(board, color, ret, index):
     """
     Fills ret with a list of moves, returns the index of the next move in the array

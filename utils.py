@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from numba import njit, vectorize, float32, int32
 
@@ -65,4 +66,56 @@ def cap_histogram(y, cap, avg_size):
         
     return indices
 
-        
+@njit
+def cut_trail(f_str):
+    cut = 0
+    for c in f_str[::-1]:
+        if c == "0":
+            cut += 1
+        else:
+            break
+    if cut == 0:
+        for c in f_str[::-1]:
+            if c == "9":
+                cut += 1
+            else:
+                cut -= 1
+                break
+    if cut > 0:
+        f_str = f_str[:-cut]
+    if f_str == "":
+        f_str = "0"
+    return f_str
+
+
+@njit
+def fstr(value):
+    if math.isnan(value):
+        return "nan"
+    elif value == 0.0:
+        return "0.0"
+    elif value < 0.0:
+        return "-" + fstr(-value)
+    elif math.isinf(value):
+        return "inf"
+    else:
+        max_digits = 16
+        min_digits = -4
+        e10 = math.floor(math.log10(value)) if value != 0.0 else 0
+        if min_digits < e10 < max_digits:
+            i_part = math.floor(value)
+            f_part = math.floor((1 + value % 1) * 10.0 ** max_digits)
+            i_str = str(i_part)
+            f_str = cut_trail(str(f_part)[1:max_digits - e10])
+            return i_str + "." + f_str
+        else:
+            m10 = value / 10.0 ** e10
+            exp_str_len = 4
+            i_part = math.floor(m10)
+            f_part = math.floor((1 + m10 % 1) * 10.0 ** max_digits)
+            i_str = str(i_part)
+            f_str = cut_trail(str(f_part)[1:max_digits])
+            e_str = str(e10)
+            if e10 >= 0:
+                e_str = "+" + e_str
+            return i_str + "." + f_str + "e" + e_str
