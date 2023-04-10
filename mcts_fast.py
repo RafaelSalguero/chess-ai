@@ -42,6 +42,10 @@ def is_expanded(indices, node_index):
 @njit
 def get_color(indices, node_index):
     depth = indices[node_index, key_depth]
+    return get_color_from_depth(depth)
+
+@njit
+def get_color_from_depth(depth):
     color = 1 if depth % 2 == 0 else -1
     return color
 
@@ -84,7 +88,6 @@ def remove_illegal(values, indices, moves, node_index):
     """
         Remove the current node from the stats, the node will still be on the child list
     """
-    print(f"removing illegal {pv_str(indices, moves, node_index)}")
 
     backprop(values, indices, node_index, -values[node_index, key_n], -values[node_index, key_t])
     # Remove all childs, since an illegal move can't have following moves:
@@ -113,7 +116,6 @@ def expand(values, indices, moves, undo_moves, node_index, first_child_index, bo
     for child_index in range(first_child_index, last_move_index):
         is_win = fill_node(values, indices, moves, undo_moves, node_index, child_index, board, repetition_ttable)
         if is_win:
-            print(f"king take found: {pv_str(indices, moves, child_index)}")
             # This is an illegal move, thus, it has no child moves
             return False
         
@@ -191,13 +193,23 @@ def get_ucb_score(values, indices, node_index, c, prior_reward):
     if(n == illegal_n):
         return -math.inf
     
-    prior = values[node_index, key_own_reward] * prior_reward
     t = values[node_index, key_t]
     depth = indices[node_index, key_depth]
-    color = get_color(indices, node_index)
+    own_reward = values[node_index, key_own_reward]
 
     parent_index = indices[node_index, key_parent_index]
     parent_n = values[parent_index, key_n]
+    return get_ucb_score_formula(own_reward, n, t, depth, parent_n, c, prior_reward)
+
+@njit
+def get_ucb_score_formula(own_reward, n, t, depth, parent_n, c, prior_reward):
+    if(n == 0):
+        return math.inf
+    if(n == illegal_n):
+        return -math.inf
+    
+    prior = own_reward * prior_reward
+    color = get_color_from_depth(depth)
 
     node_score = ((prior + t) / n) * -color
     exploration_score = math.sqrt(math.log(parent_n) / n)
