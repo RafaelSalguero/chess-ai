@@ -7,6 +7,8 @@ from utils import fstr, onehot_encode_board
 from view import print_board
 import tensorflow as tf
 
+enable_remove_checks = False
+
 class Node:
     def __init__(self, parent, childs, own_reward, is_checkmate, color, move, undo_move, depth):
         self.parent = parent
@@ -33,6 +35,8 @@ def expand(_self, color,  model, prior_weight, board):
     _self.childs = get_childs(_self, color, model, prior_weight, board)
 
 def remove_check(_self):
+    if(not enable_remove_checks):
+        return
     """
         Remove the current node from the stats, the node will still be on the child list
     """
@@ -104,7 +108,8 @@ def create_node(board, move, parent, prior_weight, eval_color, model):
 
     # prior probability:
     ret.prior = ret.own_reward * prior_weight
-    if ret.is_checkmate:
+
+    if ret.is_checkmate and enable_remove_checks:
         parent.is_check = True
 
     return ret
@@ -152,7 +157,7 @@ def model_eval(model, color, board):
     return y
 
 def rollout(board, color, model):
-    win_val = evalWin(board) * 1.05
+    win_val = evalWin(board) * 1000
 
     if(win_val == 0):
         y = model_eval(model, color, board)

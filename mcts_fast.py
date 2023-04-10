@@ -72,6 +72,7 @@ def expand(values, indices, moves, undo_moves, node_index, first_child_index, bo
 
 def undo_moves_rec(indices, moves, undo_moves, node_index, board):
     while has_parent(node_index):
+        print(f"undo move {move_str(moves[node_index])}")
         undo_move_inplace(board, moves[node_index], undo_moves[node_index])
         node_index = indices[node_index, key_parent_index]
 
@@ -200,7 +201,7 @@ def model_eval(model, color, board):
     return y
 
 def rollout(board, color, model):
-    win_val = evalWin(board) * 1.05
+    win_val = evalWin(board) * 1000
 
     if(win_val == 0):
         y = model_eval(model, color, board)
@@ -217,7 +218,8 @@ def pv_str(indices, moves, node_index):
 
 def mcts(board, iterations, c = 1, prior_weight = 2, verbose = False):
     next_child_index = 1
-    (values, indices, moves, undo_moves) = allocate(10000)
+    max_size = iterations * 3
+    (values, indices, moves, undo_moves) = allocate(max_size)
 
     for it in range(iterations):
         print(f"iteration {it}")
@@ -239,6 +241,7 @@ def mcts(board, iterations, c = 1, prior_weight = 2, verbose = False):
 
         bc = next_bc
 
+    print(f"count: {next_child_index} / {max_size}")
     print(f"best move: {best_child_index} ({moves[best_child_index]}) {indices[0, key_child_count]}")
     return moves[best_child_index]
     
