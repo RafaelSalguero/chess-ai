@@ -99,7 +99,7 @@ def remove_illegal(values, indices, moves, node_index):
 
     backprop(values, indices, node_index, -values[node_index, key_n], -values[node_index, key_t])
     # Remove all childs, since an illegal move can't have following moves:
-    indices[node_index, key_child_count] = 0
+    # indices[node_index, key_child_count] = 0
     values[node_index, key_n] = illegal_n
     
     parent_index = indices[node_index, key_parent_index]
@@ -107,8 +107,9 @@ def remove_illegal(values, indices, moves, node_index):
 
     if(indices[parent_index, key_child_count] == indices[parent_index, key_illegal_childs]):
         # No more moves in parent, so this is a checkmate
-        values[parent_index, key_own_reward] = win_bonus_ratio
-        print(f"checkmate found in {pv_str(indices, moves, parent_index)}")    
+        win_reward = get_color(indices, node_index)
+        values[parent_index, key_own_reward] = win_reward
+        # print(f"checkmate found in {pv_str(indices, moves, parent_index)}")    
 
 @njit
 def expand(values, indices, moves, undo_moves, node_index, first_child_index, board, repetition_ttable):
@@ -121,13 +122,12 @@ def expand(values, indices, moves, undo_moves, node_index, first_child_index, bo
     indices[node_index, key_child_index] = first_child_index
     indices[node_index, key_child_count] = child_count
 
+    is_check = False
     for child_index in range(first_child_index, last_move_index):
         is_win = fill_node(values, indices, moves, undo_moves, node_index, child_index, board, repetition_ttable)
-        if is_win:
-            # This is an illegal move, thus, it has no child moves
-            return False
+        is_check = is_check or is_win
         
-    return True
+    return not is_check
 
 @njit
 def undo_moves_rec(indices, moves, undo_moves, node_index, board):
@@ -140,7 +140,7 @@ def explore(values, indices, moves, undo_moves, c: float, prior_weight, board, n
     current_index = 0
 
     while indices[current_index, key_child_index] != 0 and indices[current_index, key_child_count] > 0:
-        current_index = pick_child_best_ucb(values, indices, current_index, c, prior_weight)
+        current_index = pick_child_best_ucb(values, indices, moves, current_index, c, prior_weight)
 
         move = moves[current_index]
         apply_move_inplace(board, move)
@@ -149,18 +149,17 @@ def explore(values, indices, moves, undo_moves, c: float, prior_weight, board, n
         is_legal_move = expand(values, indices, moves, undo_moves, current_index, next_child_index, board, repetition_ttable)
         undo_moves_rec(indices, moves, undo_moves, current_index, board)
 
+        child_count = indices[current_index, key_child_count]
+        next_child_index += child_count
+
         if(not is_legal_move):
             remove_illegal(values, indices, moves, current_index)
             return next_child_index
-        
-        child_count = indices[current_index, key_child_count]
-        next_child_index += child_count
 
         if child_count > 0:
             current_index = indices[current_index, key_child_index]
     else:
         undo_moves_rec(indices, moves, undo_moves, current_index, board)
-
 
     reward = values[current_index, key_own_reward]
     backprop(values, indices, current_index, 1, reward)
@@ -178,7 +177,7 @@ def backprop(values, indices, node_index, n, t):
         node_index = indices[node_index, key_parent_index]
 
 @njit
-def pick_child_best_ucb(values, indices, node_index, c, prior_reward):
+def pick_child_best_ucb(values, indices, moves, node_index, c, prior_reward):
     first_child_index = indices[node_index, key_child_index]
     child_count = indices[node_index, key_child_count]
 
@@ -186,7 +185,7 @@ def pick_child_best_ucb(values, indices, node_index, c, prior_reward):
     max_value = -math.inf
 
     for child_index in range(first_child_index, first_child_index + child_count):
-        value = get_ucb_score(values, indices, child_index, c, prior_reward)
+        value = get_ucb_score(values, indices, moves, child_index, c, prior_reward)
         if(value > max_value):
             max_value = value
             best_node_index = child_index
@@ -194,11 +193,12 @@ def pick_child_best_ucb(values, indices, node_index, c, prior_reward):
     return best_node_index
 
 @njit
-def get_ucb_score(values, indices, node_index, c, prior_reward):
+def get_ucb_score(values, indices, moves, node_index, c, prior_reward):
     n = values[node_index, key_n]
     if(n == 0):
         return math.inf
     if(n == illegal_n):
+        #print(f"node {pv_str(indices, moves, node_index)} is illegal")
         return -math.inf
     
     t = values[node_index, key_t]
@@ -310,7 +310,7 @@ def mcts(board, iterations, repetition_ttable, c = 1, prior_weight = 2, verbose 
             first_child_index = indices[bc, key_child_index]
             child_count = indices[bc, key_child_count]
             for child_index in range(first_child_index, first_child_index + child_count):
-                print(f"{pv_str(indices, moves, child_index)} (n: {fstr(values[child_index, key_n])}) (t: {fstr(values[child_index, key_t])}) (own_reward: {round(values[child_index, key_own_reward] * 100)}%) node_score: {fstr(get_ucb_score(values, indices, child_index, 0, 0))}")
+                print(f"{pv_str(indices, moves, child_index)} (n: {fstr(values[child_index, key_n])}) (t: {fstr(values[child_index, key_t])}) (own_reward: {round(values[child_index, key_own_reward] * 100)}%) node_score: {fstr(get_ucb_score(values, indices, moves, child_index, 0, 0))}")
 
         if(has_childs(indices, bc)):
             bc = pick_child_best_n(values, indices, bc)

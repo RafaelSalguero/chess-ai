@@ -218,7 +218,7 @@ def pv_str(node: Node):
     
     return pv_str(node.parent) + "->" + move_str(node.move)
 
-def mcts(board: np.array, iterations, c: float = 1, prior_weight = 2, verbose = False):
+def mcts(board: np.array, iterations, ttable, c: float = 1, prior_weight = 2, verbose = False):
     model = None
     color = 1
     root = Node(None, None, 0, False, color, None, None, 0)

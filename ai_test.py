@@ -8,6 +8,7 @@ from mcts_fast import mcts
 from moves import apply_move, flip_board, get_all_moves, get_all_moves_slow, move_str
 from ttable import init_transposition_table
 from utils import onehot_encode_board, softmax
+from view import parse_board
 
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
@@ -56,12 +57,25 @@ def ai_player(model, verbose = False):
 def sim_player(model, verbose = False):
     rep_table = init_transposition_table(16384)
     def find_best(board):
-        return mcts(board, 100000, rep_table, 1.5, 5, False)
+        return mcts(board, 150000, rep_table, 0.8, 3, False)
     
     def player (board, color):
         return auto_player(board, color, find_best)
     
     return player
 
+board = parse_board(
+"""
+8                        
+7    ♚     ♔        ♗    
+6                        
+5                ♕       
+4                        
+3                        
+2                        
+1                      ♖ 
+  a  b  c  d  e  f  g  h
+"""
+)
 win_rate = simulateGames(initialBoard, sim_player(model, False), minimax_player(4), 1, True)
 print("win_rate: ", win_rate)
