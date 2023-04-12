@@ -22,11 +22,11 @@ tf.config.set_visible_devices([], 'GPU')
 
 # data = np.load("train_data/get_sim_games_2_16384.npz")
 print("generating train data")
-(x_train, y_train, ply_train) = get_train_data(10, 5, 300, 20000000, True)
+(x_train, y_train, ply_train) = get_train_data(0, 0, 1000, 1000000, True)
 
 print("generating test data")
 
-(x_test, y_test, ply_test) = get_train_data(10, 5, 300, 1000000, True)
+(x_test, y_test, ply_test) = get_train_data(0, 0, 1000, 500000, True)
 
 if(True):
     reduce_non_wins(x_train, y_train)
@@ -84,19 +84,13 @@ def create_model():
 
     x = inputs
 
-    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(32, 7, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(8, 1, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(2, 1, padding="same", activation="relu")(x)
 
-    x = tf.keras.layers.AveragePooling2D(pool_size=(2,2))(x)
-
-    x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
-    x = tf.keras.layers.Conv2D(4, 3, padding="same", activation="relu")(x)
+    x = tf.keras.layers.AveragePooling2D(pool_size=(8,8))(x)
 
     x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(16, activation = "relu")(x)
-    x = tf.keras.layers.Dropout(0.2)(x)
-
+    x = tf.keras.layers.Dense(4, activation = "relu")(x)
     x = tf.keras.layers.Dense(1, activation = "sigmoid")(x)
 
     model = tf.keras.Model(inputs = inputs, outputs = x)

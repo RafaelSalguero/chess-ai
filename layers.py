@@ -140,9 +140,16 @@ def _set_data(layer: KerasNumbaLayer, data):
 
 @njit
 def calc_layers(input, layers_data: list[KerasNumbaLayer]):
+    set_layer_input_data(input, layers_data)
+    return calc_layers(layers_data)
+
+@njit
+def set_layer_input_data(input, layers_data: list[KerasNumbaLayer]):
     first_layer = layers_data[0]
     _set_data(first_layer, input)
 
+@njit
+def calc_layers(layers_data: list[KerasNumbaLayer]):
     for i in range(1, len(layers_data)):
         prev = layers_data[i - 1]
         curr = layers_data[i]

@@ -1,9 +1,10 @@
 import numpy as np
 import math
 from eval import evalBoard, evalWin
+from layers import calc_layers, set_layer_input_data
 from moves import allocate_moves_array, apply_move_inplace, flip_board, get_all_moves, move_str, undo_move_inplace
 from ttable import get_transposition_table, set_transposition_table
-from utils import fstr, get_np_hash
+from utils import fstr, get_np_hash, onehot_encode_board, onehot_encode_board_n
 from numba import njit
 
 from view import print_board
@@ -21,6 +22,8 @@ key_own_reward = 2
 illegal_n = -1.0
 
 win_bonus_ratio = 1.05
+
+rollout_on_expand = False
 
 @njit
 def allocate(count):
@@ -64,7 +67,7 @@ def get_parent(indices, node_index):
     return indices[node_index, key_parent_index]
 
 @njit
-def fill_node(values, indices, moves, undo_moves, parent_index, node_index, board, repetition_ttable):
+def fill_node(values, indices, moves, undo_moves, parent_index, node_index, board, model, repetition_ttable, eval_ttable):
     undo_move = apply_move_inplace(board, moves[node_index])
     
     undo_moves[node_index, 0] = undo_move[0]
@@ -80,14 +83,14 @@ def fill_node(values, indices, moves, undo_moves, parent_index, node_index, boar
         # A draw node has no childs, so we initialized as already expanded with 0 childs:
         indices[node_index, key_child_index] = node_index + 1
         indices[node_index, key_child_count] = 0
-    
-    own_reward = 0.0 if is_draw else rollout(board, 1, node_color, None)
+
+    if(rollout_on_expand):
+        own_reward = 0.0 if is_draw else rollout(board, 1, node_color, None, eval_ttable)    
+        values[node_index, key_own_reward] = own_reward
+
     is_win = evalWin(board) != 0
 
-
     undo_move_inplace(board, moves[node_index], undo_move)
-
-    values[node_index, key_own_reward] = own_reward
 
     return is_win
     
@@ -112,7 +115,7 @@ def remove_illegal(values, indices, moves, node_index):
         # print(f"checkmate found in {pv_str(indices, moves, parent_index)}")    
 
 @njit
-def expand(values, indices, moves, undo_moves, node_index, first_child_index, board, repetition_ttable):
+def expand(values, indices, moves, undo_moves, node_index, first_child_index, board, model, repetition_ttable, eval_ttable):
     if(first_child_index > (len(moves) - 128)):
         print(f"first child index {first_child_index} limit is close to {len(moves)} !")
     last_move_index = get_all_moves(board, get_color(indices, node_index), moves, first_child_index)
@@ -124,7 +127,7 @@ def expand(values, indices, moves, undo_moves, node_index, first_child_index, bo
 
     is_check = False
     for child_index in range(first_child_index, last_move_index):
-        is_win = fill_node(values, indices, moves, undo_moves, node_index, child_index, board, repetition_ttable)
+        is_win = fill_node(values, indices, moves, undo_moves, node_index, child_index, board, model, repetition_ttable, eval_ttable)
         is_check = is_check or is_win
         
     return not is_check
@@ -136,7 +139,7 @@ def undo_moves_rec(indices, moves, undo_moves, node_index, board):
         node_index = indices[node_index, key_parent_index]
 
 @njit
-def explore(values, indices, moves, undo_moves, c: float, prior_weight, board, next_child_index, repetition_ttable):
+def explore(values, indices, moves, undo_moves, model, c: float, prior_weight, board, next_child_index, repetition_ttable, eval_ttable):
     current_index = 0
 
     while indices[current_index, key_child_index] != 0 and indices[current_index, key_child_count] > 0:
@@ -145,23 +148,32 @@ def explore(values, indices, moves, undo_moves, c: float, prior_weight, board, n
         move = moves[current_index]
         apply_move_inplace(board, move)
 
+    
+
     if values[current_index, key_n] > 0 and not is_expanded(indices, current_index):
-        is_legal_move = expand(values, indices, moves, undo_moves, current_index, next_child_index, board, repetition_ttable)
-        undo_moves_rec(indices, moves, undo_moves, current_index, board)
+        is_legal_move = expand(values, indices, moves, undo_moves, current_index, next_child_index, board, model, repetition_ttable, eval_ttable)
 
         child_count = indices[current_index, key_child_count]
         next_child_index += child_count
 
         if(not is_legal_move):
+            undo_moves_rec(indices, moves, undo_moves, current_index, board)
             remove_illegal(values, indices, moves, current_index)
             return next_child_index
 
         if child_count > 0:
             current_index = indices[current_index, key_child_index]
+            apply_move_inplace(board, moves[current_index])
+        
+    reward = 0
+    if(rollout_on_expand):
+        reward = values[current_index, key_own_reward]
     else:
-        undo_moves_rec(indices, moves, undo_moves, current_index, board)
+        reward = rollout(board, 1, get_color(indices, current_index), model, eval_ttable)
+    values[current_index, key_own_reward] = reward
 
-    reward = values[current_index, key_own_reward]
+    undo_moves_rec(indices, moves, undo_moves, current_index, board)
+
     backprop(values, indices, current_index, 1, reward)
 
     return next_child_index
@@ -222,7 +234,7 @@ def get_ucb_score_formula(own_reward, n, t, depth, parent_n, c, prior_reward):
     node_score = ((prior + t) / n) * -color
     exploration_score = math.sqrt(math.log(parent_n) / n)
 
-    return node_score + (c / depth) * exploration_score
+    return node_score + (c) * exploration_score
 
 @njit
 def pick_child_best_n(values, indices, node_index):
@@ -248,29 +260,52 @@ def eval_to_prob(x):
     return np.cbrt(x) / np.cbrt(150)
 
 @njit
-def model_eval(model, color, board):
+def encode_ttable_value(x):
+    return np.round(np.power(x * np.cbrt(900), 3))
+
+@njit
+def decode_ttable_value(x):
+    return np.cbrt(x) / np.cbrt(900)
+
+@njit
+def model_eval(model, node_color, board):
     b = board
     
-    if(color == -1):
+    if(node_color == -1):
         b = flip_board(board)
     
-    nn_eval = False
+    nn_eval = True
     y = 0
+    
+    onehot_encode_board_n(b, model[0].data3d[0])
+    y = calc_layers(model).data1d[0][0]
     if(nn_eval):
-        # y = internal_model_eval(model, onehot_encode_board(b).reshape((-1, 8, 8, 8))).numpy().reshape(-1)[0]
-        # y = (y - 0.5) * 2
-        y = 0.0
+
+        y = (y - 0.5) * 2 * node_color
+
+        #print(f"eval model: {fstr(y)}")
+        #print(f"eval board: {fstr(eval_to_prob(evalBoard(board, 1)))}")
+        #print_board(board)
     else:
         y = eval_to_prob(evalBoard(board, 1))
 
     return y
 
 @njit
-def rollout(board, eval_color, node_color, model):
+def rollout(board, eval_color, node_color, model, eval_ttable):
     win_val = evalWin(board) * win_bonus_ratio
 
     if(win_val == 0):
-        y = model_eval(model, eval_color, board)
+        (match, value) = get_transposition_table(eval_ttable, board, node_color, 1)
+
+        if(match):
+            #print(f"ttable match {fstr(decode_ttable_value(value))} {fstr(y)} ")
+            return decode_ttable_value(value)
+
+        y = model_eval(model, node_color, board)
+        set_transposition_table(eval_ttable, board, node_color, 1, np.round(encode_ttable_value(y)))
+
+        return y
     else:
         y = win_val * eval_color
 
@@ -294,13 +329,14 @@ def add_repetition_table_entry(board, move, ttable):
     undo_move_inplace(board, move, undo_move)
 
 @njit
-def mcts(board, iterations, repetition_ttable, c = 1, prior_weight = 2, verbose = False):
+def mcts(board, iterations, repetition_ttable, eval_ttable, model, c = 1, prior_weight = 2, verbose = False):
     next_child_index = 1
     max_size = iterations * 15
     (values, indices, moves, undo_moves) = allocate(max_size)
+    set_layer_input_data(np.zeros((8,8,8), np.float32), model)
 
     for it in range(iterations):
-        next_child_index = explore(values, indices, moves, undo_moves, c, prior_weight, board, next_child_index, repetition_ttable)
+        next_child_index = explore(values, indices, moves, undo_moves, model, c, prior_weight, board, next_child_index, repetition_ttable, eval_ttable)
 
     best_child_index = pick_child_best_n(values, indices, 0)
 
@@ -310,7 +346,7 @@ def mcts(board, iterations, repetition_ttable, c = 1, prior_weight = 2, verbose 
             first_child_index = indices[bc, key_child_index]
             child_count = indices[bc, key_child_count]
             for child_index in range(first_child_index, first_child_index + child_count):
-                print(f"{pv_str(indices, moves, child_index)} (n: {fstr(values[child_index, key_n])}) (t: {fstr(values[child_index, key_t])}) (own_reward: {round(values[child_index, key_own_reward] * 100)}%) node_score: {fstr(get_ucb_score(values, indices, moves, child_index, 0, 0))}")
+                print(f"{pv_str(indices, moves, child_index)} (n: {fstr(values[child_index, key_n])}) (t: {fstr(values[child_index, key_t])}) (own_reward: {round(values[child_index, key_own_reward] * 100)}%, reward: {round((values[child_index, key_t] / (values[child_index, key_n] + 0.01)) * 100)}%) node_score: {fstr(get_ucb_score(values, indices, moves, child_index, 0, 0))}")
 
         if(has_childs(indices, bc)):
             bc = pick_child_best_n(values, indices, bc)

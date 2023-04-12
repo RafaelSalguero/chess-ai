@@ -15,7 +15,7 @@ import tensorflow as tf
 tf.config.set_visible_devices([], 'GPU')
 
 
-model = tf.keras.models.load_model("models/alpha_beta_3_8M_300_it")
+model = tf.keras.models.load_model("models/alpha_beta_3_small")
 
 layer_data = get_layer_data(model.layers)
 
@@ -33,23 +33,24 @@ def from_model_space(x):
 
 board = parse_board(
 """
-8                        
-7    ♚     ♔        ♗    
+8 ♜  ♞  ♝  ♛  ♚  ♝  ♞  ♜ 
+7    ♟  ♟  ♟  ♟  ♟  ♟  ♟ 
 6                        
-5                ♕       
-4                        
-3                        
-2                        
-1                      ♖ 
+5 ♟                      
+4                ♗       
+3          ♙             
+2 ♙  ♙  ♙     ♙  ♙  ♙  ♙ 
+1 ♖  ♘     ♕  ♔  ♗  ♘  ♖ 
   a  b  c  d  e  f  g  h
 """
 )
 
 
-ttable = init_transposition_table(1024)
+repetition_ttable = init_transposition_table(1024)
 # add_repetition_table_entry(board, str_move("c1d3"), ttable)
 
-move = mcts(board, 200000, ttable, 1, 3, True)
+eval_ttable = init_transposition_table(1024 * 1024 * 128)
+move = mcts(board, 200000, repetition_ttable, eval_ttable, layer_data, 1, 3, True)
 
 print_board(board)
 print(move_str(move))

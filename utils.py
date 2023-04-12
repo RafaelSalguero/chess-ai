@@ -16,8 +16,21 @@ def get_np_hash(arr):
 
 
 _onehot_diags = np.concatenate((-np.flip(np.eye(8), 0), np.zeros((1,8)), np.eye(8))).astype(np.float32)
+
 def onehot_encode_board(x):
     return _onehot_diags[x + 8]
+
+@njit
+def onehot_encode_board_n(board, dest):
+    for y in range(0, 8):
+        for x in range(0, 8):
+            piece = board[y, x]
+            for i in range(0, 8):
+                dest[y, x, i] = 0
+            if(piece != 0):
+                index = abs(piece) - 1
+                dest[y, x, index] = np.sign(piece)
+            
 
 @njit
 def shuffle(items):

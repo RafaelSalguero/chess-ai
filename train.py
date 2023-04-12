@@ -72,7 +72,6 @@ def get_sim_games(depth, quiescence_depth, max_iter, size=128, threads = 8, verb
     if(size % threads != 0):
         raise Exception("Size must be a multiple of threads")
     
-    # For some reason the ttable is not working (looks like evals are wrong too)
     ttable = init_transposition_table(1024 * 1024 * 1024)
 
     boards = np.empty((size, 8, 8), dtype=np.int32)
