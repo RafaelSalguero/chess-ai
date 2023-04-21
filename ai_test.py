@@ -14,14 +14,14 @@ from view import parse_board
 # Disable GPU training:
 tf.config.set_visible_devices([], 'GPU')
 
-model = tf.keras.models.load_model("models/alpha_beta_3_small")
+model = tf.keras.models.load_model("models/alpha_beta_3")
 layer_data = get_layer_data(model.layers)
 
 def sim_player(model, verbose = False):
     rep_table = init_transposition_table(16384)
     eval_ttable = init_transposition_table(1024 * 1024 * 1024)
     def find_best(board):
-        return mcts(board, 200000, rep_table, eval_ttable, layer_data, 1, 3, False)
+        return mcts(board, 50000, rep_table, eval_ttable, layer_data, 1, 3, False)
     
     def player (board, color):
         return auto_player(board, color, find_best)

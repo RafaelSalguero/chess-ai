@@ -2,6 +2,7 @@ import numpy as np
 import math
 from eval import evalBoard, evalWin
 from layers import calc_layers, set_layer_input_data
+from minmax import alphabeta
 from moves import allocate_moves_array, apply_move_inplace, flip_board, get_all_moves, move_str, undo_move_inplace
 from ttable import get_transposition_table, set_transposition_table
 from utils import fstr, get_np_hash, onehot_encode_board, onehot_encode_board_n
