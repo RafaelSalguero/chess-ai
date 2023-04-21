@@ -2,6 +2,7 @@ from collections import OrderedDict
 import numpy as np
 import math
 from eval import evalBoard, evalWin
+from minmax import minimax
 from moves import allocate_moves_array, apply_move, apply_move_inplace, flip_board, get_all_moves, get_all_moves_slow, move_str, undo_move_inplace
 from utils import fstr, onehot_encode_board
 from view import print_board
@@ -149,7 +150,8 @@ def model_eval(model, color, board):
         # y = (y - 0.5) * 2
         y = 0.0
     else:
-        y = eval_to_prob(evalBoard(board, 1))
+        (value, best_variation, best_move, iters) = minimax(b, 1, 2, evalBoard, False)
+        y = eval_to_prob(value)
 
     return y
 
